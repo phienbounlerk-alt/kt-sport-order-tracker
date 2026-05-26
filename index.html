@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="lo">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KT SPORT - Track Order</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><img src="./assets/kt-sport-logo.jpg" alt="KT SPORT logo" /></div>
+        <div>
+          <strong>KT SPORT</strong>
+          <span>ເຄທີ ສະປອສ</span>
+        </div>
+      </div>
+      <nav class="nav-actions" aria-label="Main navigation">
+        <a class="nav-link" href="./admin.html">Admin</a>
+        <button class="icon-button" title="Cart" aria-label="Cart">🛒</button>
+        <button class="icon-button" title="Menu" aria-label="Menu">☰</button>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <section class="lookup-band" aria-label="Search order">
+        <div>
+          <p class="eyebrow">ຕິດຕາມອໍເດີ້</p>
+          <h1>ກວດສະຖານະການຜະລິດຂອງລູກຄ້າ</h1>
+        </div>
+        <form id="searchForm" class="search-box">
+          <input id="orderCodeInput" type="text" value="J261038" aria-label="Order code" />
+          <button type="submit">ຄົ້ນຫາ</button>
+        </form>
+      </section>
+
+      <section class="status-card">
+        <h2>ສະຖານະອໍເດີ້</h2>
+        <div class="hero-status">
+          <div class="product-preview">
+            <img id="mainProductImage" alt="Product preview" />
+          </div>
+          <div class="current-state">
+            <div class="state-icon" id="currentIcon">📄</div>
+            <p id="currentStatusLabel">ອອກບິນຜະລິດ</p>
+            <span id="currentStatusTime">-</span>
+          </div>
+        </div>
+        <div class="progress-summary">
+          <div class="progress-track" aria-hidden="true">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <p id="progressText">0% ຂອງຂະບວນການ</p>
+        </div>
+      </section>
+
+      <section class="tracking-panel">
+        <h2>ຕິດຕາມຂະບວນການຜະລິດ</h2>
+        <ol id="stepsList" class="steps-list"></ol>
+      </section>
+
+      <section class="details-grid">
+        <article class="order-info">
+          <h2>ຂໍ້ມູນບິນ</h2>
+          <dl id="orderDetails"></dl>
+        </article>
+
+        <article class="customer-tools">
+          <h2>Tracking Link</h2>
+          <p id="publicNotice" data-tone="muted">ກຳລັງດຶງຂໍ້ມູນ...</p>
+          <div class="share-box">
+            <input id="trackingUrlInput" readonly aria-label="Tracking link" />
+            <button id="copyPublicLinkButton" type="button">Copy</button>
+          </div>
+          <div class="quick-summary" id="quickSummary"></div>
+        </article>
+      </section>
+
+      <section class="history-panel">
+        <h2>ປະຫວັດການຜະລິດ</h2>
+        <ol id="publicHistoryList" class="public-history-list"></ol>
+      </section>
+
+      <section class="order-products">
+        <h2>ສິນຄ້າທີ່ສັ່ງຊື້ທັງໝົດ</h2>
+        <ol id="productList" class="product-list"></ol>
+      </section>
+    </main>
+
+    <a class="contact-float" href="https://wa.me/8562029933696" aria-label="Contact shop">☎</a>
+
+    <footer class="footer">
+      <div>
+        <strong>KT SPORT</strong>
+        <p>ເຄທີ ສະປອສ - production tracking</p>
+      </div>
+      <p>v0.1.0 MVP</p>
+    </footer>
+
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

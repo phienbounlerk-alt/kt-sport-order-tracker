@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: kt-sport-tracking
+    env: docker
+    plan: starter
+    healthCheckPath: /api/health
+    disk:
+      name: kt-sport-data
+      mountPath: /var/data/kt-sport
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data/kt-sport
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false

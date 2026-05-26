@@ -1,0 +1,88 @@
+{
+  "J261038": {
+    "code": "J261038",
+    "createdAt": "2026-05-19T08:00:00",
+    "receiveDate": null,
+    "depositStatus": "PENDING",
+    "customerName": "ບໍ່ລະບຸຊື່...",
+    "phone": "-",
+    "addressCf": "-",
+    "productionStatus": "PATTERN",
+    "productImage": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=700&q=80",
+    "productionHistory": [
+      {
+        "status": "PRODUCTION_ORDER",
+        "note": "ສ້າງບິນຜະລິດ",
+        "createdAt": "2026-05-19T08:00:00"
+      },
+      {
+        "status": "PATTERN",
+        "note": "",
+        "createdAt": "2026-05-26T07:48:53.755Z"
+      }
+    ],
+    "products": [
+      {
+        "productName": "ເສື້ອທີມ Custom Sublimation",
+        "shopSize": "M x2, L x3, XL x1",
+        "amount": 6,
+        "price": 85000,
+        "totalPrice": 510000,
+        "image": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=220&q=80",
+        "images": [
+          "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=220&q=80"
+        ],
+        "freeGifts": [
+          {
+            "size": "M",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "productName": "ກາງເກງກິລາ",
+        "shopSize": "L x6",
+        "amount": 6,
+        "price": 65000,
+        "totalPrice": 390000,
+        "image": "https://images.unsplash.com/photo-1506629905607-d405d7d3b0d2?auto=format&fit=crop&w=220&q=80",
+        "images": [
+          "https://images.unsplash.com/photo-1506629905607-d405d7d3b0d2?auto=format&fit=crop&w=220&q=80"
+        ],
+        "freeGifts": []
+      }
+    ]
+  },
+  "26-05197": {
+    "code": "26-05197",
+    "createdAt": "2026-05-26T07:52:50.428Z",
+    "receiveDate": "2026-06-10T00:00:00",
+    "depositStatus": "PENDING",
+    "customerName": "joy",
+    "phone": "02092699612",
+    "addressCf": "ອະນຸສິດ ສາຂາ ຕະຫຼາດເຂດ ເມືອງໃຊທານີ ນະຄອນຫຼວງ",
+    "productionStatus": "PRODUCTION_ORDER",
+    "productImage": "/uploads/1779781902515-ff5d969f1c67.jpg",
+    "productionHistory": [
+      {
+        "status": "PRODUCTION_ORDER",
+        "note": "ສ້າງບິນຜະລິດ",
+        "createdAt": "2026-05-26T07:52:50.428Z"
+      }
+    ],
+    "products": [
+      {
+        "productName": "ເສື້ອພິມລາຍ",
+        "shopSize": "L.  12",
+        "amount": 12,
+        "price": 110000,
+        "totalPrice": 1320000,
+        "image": "/uploads/1779781902515-ff5d969f1c67.jpg",
+        "images": [
+          "/uploads/1779781902515-ff5d969f1c67.jpg"
+        ],
+        "freeGifts": []
+      }
+    ]
+  }
+}

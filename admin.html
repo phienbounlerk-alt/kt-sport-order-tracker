@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="lo">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KT SPORT - Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand brand-link" href="./index.html">
+        <div class="brand-mark"><img src="./assets/kt-sport-logo.jpg" alt="KT SPORT logo" /></div>
+        <div>
+          <strong>KT SPORT Admin</strong>
+          <span>ເຄທີ ສະປອສ</span>
+        </div>
+      </a>
+      <nav class="nav-actions" aria-label="Admin navigation">
+        <a class="nav-link" href="./index.html">Tracking</a>
+        <button id="logoutButton" class="icon-button" type="button" title="Logout">⏻</button>
+      </nav>
+    </header>
+
+    <main class="admin-shell">
+      <section class="admin-heading">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h1>ຈັດການອໍເດີ້ ແລະ ອອກ tracking link</h1>
+        </div>
+        <button id="newOrderButton" type="button">ສ້າງບິນໃໝ່</button>
+      </section>
+
+      <section id="adminStats" class="admin-stats" aria-label="Order summary"></section>
+
+      <section class="admin-layout">
+        <aside class="admin-list-panel">
+          <div class="panel-title-row">
+            <h2>ລາຍການບິນ</h2>
+            <button id="refreshOrdersButton" type="button" title="Refresh">↻</button>
+          </div>
+          <div class="list-filters">
+            <input id="orderSearchInput" placeholder="ຄົ້ນຫາເລກບິນ, ຊື່, ເບີ" />
+            <select id="statusFilterSelect">
+              <option value="ALL">ທຸກສະຖານະ</option>
+            </select>
+            <select id="depositFilterSelect">
+              <option value="ALL">ທຸກການຊຳລະ</option>
+              <option value="PENDING">ຍັງຄ້າງຊຳລະ</option>
+              <option value="PAID_FULL">ຈ່າຍເຕັມຈຳນວນ</option>
+            </select>
+          </div>
+          <div id="ordersList" class="orders-list"></div>
+        </aside>
+
+        <section class="admin-form-panel">
+          <div class="panel-title-row">
+            <h2 id="formTitle">ສ້າງບິນໃໝ່</h2>
+            <div class="link-actions">
+              <button id="copyTrackingButton" type="button">Copy link</button>
+              <a id="trackingLink" class="tracking-link" href="./index.html" target="_blank">ເປີດ tracking</a>
+            </div>
+          </div>
+
+          <form id="orderForm" class="order-form">
+            <div class="form-grid">
+              <label>
+                ເລກບິນ
+                <input id="codeInput" name="code" placeholder="Auto" />
+              </label>
+              <label>
+                ສະຖານະມັດຈຳ
+                <select id="depositStatusInput" name="depositStatus">
+                  <option value="PENDING">ຍັງຄ້າງຊຳລະ</option>
+                  <option value="PAID_FULL">ຈ່າຍເຕັມຈຳນວນ</option>
+                </select>
+              </label>
+              <label>
+                ວັນທີຮັບເຄື່ອງ
+                <input id="receiveDateInput" name="receiveDate" type="date" />
+              </label>
+              <label>
+                ຊື່ລູກຄ້າ
+                <input id="customerNameInput" name="customerName" required />
+              </label>
+              <label>
+                ເບີໂທ
+                <input id="phoneInput" name="phone" />
+              </label>
+              <label class="full-span">
+                ທີ່ຢູ່ຈັດສົ່ງ
+                <textarea id="addressInput" name="addressCf" rows="2"></textarea>
+              </label>
+            </div>
+
+            <div class="panel-title-row products-heading">
+              <h2>ສິນຄ້າ</h2>
+              <button id="addProductButton" type="button">ເພີ່ມສິນຄ້າ</button>
+            </div>
+            <div id="productsEditor" class="products-editor"></div>
+
+            <div class="form-actions">
+              <button id="saveOrderButton" type="submit">ບັນທຶກບິນ</button>
+              <span id="adminPageNotice" data-tone="muted">ກຳລັງດຶງຂໍ້ມູນ...</span>
+            </div>
+          </form>
+
+          <section class="workflow-panel">
+            <div class="panel-title-row">
+              <h2>Production Workflow</h2>
+              <span id="workflowCurrentBadge" class="workflow-badge">-</span>
+            </div>
+            <div class="workflow-controls">
+              <label>
+                ສະຖານະການຜະລິດ
+                <select id="workflowStatusSelect"></select>
+              </label>
+              <label>
+                Note
+                <input id="workflowNoteInput" placeholder="ລາຍລະອຽດຂອງຂັ້ນຕອນນີ້" />
+              </label>
+              <button id="updateWorkflowButton" type="button">ອັບເດດ status</button>
+            </div>
+            <ol id="workflowHistory" class="workflow-history"></ol>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="./config.js"></script>
+    <script src="./admin.js"></script>
+  </body>
+</html>
