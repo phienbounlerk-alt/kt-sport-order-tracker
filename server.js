@@ -230,7 +230,12 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { authenticated: isAuthenticated(req) });
   }
 
-  if (req.method === "GET" && url.pathname === "/api/health") {
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/health") {
+    if (req.method === "HEAD") {
+      res.writeHead(200, { "Content-Type": "application/json;charset=utf-8" });
+      res.end();
+      return;
+    }
     return sendJson(res, 200, { ok: true, dataFile, uploadsDir });
   }
 
