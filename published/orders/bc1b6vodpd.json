@@ -14,5 +14,8 @@
   "teamName": "K900",
   "orderDate": "2026-05-26",
   "dueDate": "2026-06-05",
-  "note": ""
+  "note": "",
+  "mockupImages": [
+    "published/mockups/bc1b6vodpd.jpg"
+  ]
 }

@@ -107,13 +107,23 @@ async function loadOrders() {
 }
 
 function normalizeOrder(order) {
-  return {
+  const normalized = {
     paymentStatus: paymentStatuses[0],
     totalAmount: 0,
     depositAmount: 0,
     mockupImage: "",
     ...order,
   };
+  normalized.mockupImages = orderMockupImages(normalized);
+  normalized.mockupImage = normalized.mockupImages[0] || "";
+  return normalized;
+}
+
+function orderMockupImages(order) {
+  const images = Array.isArray(order?.mockupImages) ? order.mockupImages : [];
+  const allImages = [...images];
+  if (order?.mockupImage) allImages.unshift(order.mockupImage);
+  return [...new Set(allImages.map((image) => String(image || "").trim()).filter(Boolean))];
 }
 
 async function saveOrders(orders) {
@@ -187,18 +197,22 @@ async function trackingUrlForShare(order) {
 }
 
 function publicOrder(order) {
-  const mockupImage = String(order.mockupImage || "");
+  const mockupImages = orderMockupImages(order).filter((image) => image.length <= SHARE_IMAGE_MAX_BYTES);
   return {
     ...order,
-    mockupImage: mockupImage.length <= SHARE_IMAGE_MAX_BYTES ? mockupImage : "",
+    mockupImages,
+    mockupImage: mockupImages[0] || "",
   };
 }
 
 async function shareReadyOrder(order) {
-  const mockupImage = String(order.mockupImage || "");
-  if (!mockupImage || mockupImage.length <= SHARE_IMAGE_MAX_BYTES) return order;
-  const compressed = await compressImageSource(mockupImage);
-  return { ...order, mockupImage: compressed.length <= SHARE_IMAGE_MAX_BYTES ? compressed : "" };
+  const images = orderMockupImages(order);
+  const compressedImages = [];
+  for (const image of images) {
+    const readyImage = image.length <= SHARE_IMAGE_MAX_BYTES ? image : await compressImageSource(image);
+    if (readyImage.length <= SHARE_IMAGE_MAX_BYTES) compressedImages.push(readyImage);
+  }
+  return { ...order, mockupImages: compressedImages, mockupImage: compressedImages[0] || "" };
 }
 
 function encodeShareData(value) {
@@ -326,10 +340,13 @@ async function compressImageSource(src) {
   return canvas.toDataURL("image/jpeg", 0.38);
 }
 
-async function fileToShareImage(file) {
-  if (!file) return "";
-  const raw = await fileToDataUrl(file);
-  return compressImageSource(raw);
+async function filesToFullImages(files) {
+  const images = [];
+  for (const file of Array.from(files || [])) {
+    const dataUrl = await fileToDataUrl(file);
+    if (dataUrl) images.push(dataUrl);
+  }
+  return images;
 }
 
 async function copyText(text, message = "ຄັດລອກແລ້ວ") {
@@ -536,6 +553,7 @@ function settingsForm(settings) {
 
 function orderForm(order) {
   const value = (key, fallback = "") => h(order?.[key] ?? fallback);
+  const mockupImages = orderMockupImages(order);
   return `
     <form id="orderForm" class="form-grid">
       <input type="hidden" name="id" value="${value("id")}" />
@@ -595,12 +613,13 @@ function orderForm(order) {
         <input class="input" name="depositAmount" type="number" min="0" value="${value("depositAmount", 0)}" />
       </div>
       <div class="field full">
-        <label>ຮູບ mockup ເສື້ອ</label>
-        <input type="hidden" name="mockupImage" value="${value("mockupImage")}" />
-        <input class="input" id="mockupInput" name="mockupFile" type="file" accept="image/*" />
-        <button id="mockupPreview" class="mockup-preview ${order?.mockupImage ? "has-image" : ""}" type="button" ${order?.mockupImage ? `data-open-mockup="${h(order.mockupImage)}"` : ""}>
-          ${order?.mockupImage ? `<img src="${h(order.mockupImage)}" alt="Mockup preview" />` : `<span>ຍັງບໍ່ມີຮູບ mockup</span>`}
-        </button>
+        <label>ຮູບ mockup ເສື້ອ 4K / ຫຼາຍຮູບ</label>
+        <input type="hidden" name="mockupImages" value="${h(JSON.stringify(mockupImages))}" />
+        <input type="hidden" name="mockupImage" value="${h(mockupImages[0] || "")}" />
+        <input class="input" id="mockupInput" name="mockupFiles" type="file" accept="image/*" multiple />
+        <div id="mockupPreview" class="mockup-preview-grid ${mockupImages.length ? "has-image" : ""}">
+          ${mockupPreviewItems(mockupImages)}
+        </div>
       </div>
       <div class="field full">
         <label>ຫມາຍເຫດໃຫ້ລູກຄ້າເຫັນ</label>
@@ -642,6 +661,35 @@ function orderRows(orders) {
   `).join("");
 }
 
+function mockupPreviewItems(images) {
+  if (!images.length) return `<span class="mockup-empty">ຍັງບໍ່ມີຮູບ mockup</span>`;
+  return images.map((image, index) => `
+    <button class="mockup-preview-item" type="button" data-open-mockup="${h(image)}" aria-label="ເບິ່ງ mockup ${index + 1}">
+      <img src="${h(image)}" alt="Mockup preview ${index + 1}" />
+      <span>${index + 1}</span>
+    </button>
+  `).join("");
+}
+
+function readMockupImagesValue(value) {
+  try {
+    const images = JSON.parse(value || "[]");
+    return Array.isArray(images) ? images.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setMockupPreview(images) {
+  const normalizedImages = [...new Set(images.filter(Boolean))];
+  document.querySelector('input[name="mockupImages"]').value = JSON.stringify(normalizedImages);
+  document.querySelector('input[name="mockupImage"]').value = normalizedImages[0] || "";
+  const preview = document.querySelector("#mockupPreview");
+  preview.className = `mockup-preview-grid ${normalizedImages.length ? "has-image" : ""}`;
+  preview.innerHTML = mockupPreviewItems(normalizedImages);
+  bindImageModal();
+}
+
 function bindAdmin() {
   document.querySelector("#settingsForm").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -664,21 +712,18 @@ function bindAdmin() {
   });
 
   document.querySelector("#mockupInput").addEventListener("change", async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const dataUrl = await fileToShareImage(file);
-    document.querySelector('input[name="mockupImage"]').value = dataUrl;
-    document.querySelector("#mockupPreview").className = "mockup-preview has-image";
-    document.querySelector("#mockupPreview").dataset.openMockup = dataUrl;
-    document.querySelector("#mockupPreview").innerHTML = `<img src="${h(dataUrl)}" alt="Mockup preview" />`;
-    bindImageModal();
+    const uploadedImages = await filesToFullImages(event.target.files);
+    if (!uploadedImages.length) return;
+    const existingImages = readMockupImagesValue(document.querySelector('input[name="mockupImages"]').value);
+    setMockupPreview([...existingImages, ...uploadedImages]);
   });
 
   document.querySelector("#orderForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const uploadedMockup = await fileToShareImage(event.currentTarget.mockupFile.files[0]);
-    const existingMockup = data.mockupImage ? await compressImageSource(data.mockupImage) : "";
+    const existingImages = readMockupImagesValue(data.mockupImages);
+    const uploadedImages = await filesToFullImages(event.currentTarget.mockupFiles.files);
+    const mockupImages = [...new Set([...existingImages, ...uploadedImages])];
     const orders = await loadOrders();
     const record = {
       ...data,
@@ -688,9 +733,10 @@ function bindAdmin() {
       quantity: Number(data.quantity || 0),
       totalAmount: Number(data.totalAmount || 0),
       depositAmount: Number(data.depositAmount || 0),
-      mockupImage: uploadedMockup || existingMockup || "",
+      mockupImages,
+      mockupImage: mockupImages[0] || "",
     };
-    delete record.mockupFile;
+    delete record.mockupFiles;
     const index = orders.findIndex((order) => order.id === record.id);
     if (index >= 0) {
       orders[index] = record;
@@ -787,6 +833,11 @@ async function renderTracker(token) {
       ...(sharedOrder || {}),
       ...(publishedOrder || {}),
       ...(localOrder || {}),
+      mockupImages: [
+        ...orderMockupImages(publishedOrder),
+        ...orderMockupImages(localOrder),
+        ...orderMockupImages(sharedOrder),
+      ],
       mockupImage: publishedOrder?.mockupImage || localOrder?.mockupImage || sharedOrder?.mockupImage || "",
     })
     : null;
@@ -861,11 +912,23 @@ async function renderTracker(token) {
 }
 
 function mockupBlock(order) {
-  if (order.mockupImage) {
+  const images = orderMockupImages(order);
+  if (images.length) {
     return `
-      <button class="mockup-art" type="button" data-open-mockup="${h(order.mockupImage)}" aria-label="ເບິ່ງ mockup ຂະໜາດໃຫຍ່">
-        <img src="${h(order.mockupImage)}" alt="Mockup ເສື້ອ ${h(order.code)}" />
-      </button>
+      <div class="mockup-gallery">
+        <button class="mockup-art" type="button" data-open-mockup="${h(images[0])}" aria-label="ເບິ່ງ mockup ຂະໜາດໃຫຍ່">
+          <img src="${h(images[0])}" alt="Mockup ເສື້ອ ${h(order.code)}" />
+        </button>
+        ${images.length > 1 ? `
+          <div class="mockup-strip">
+            ${images.map((image, index) => `
+              <button type="button" data-open-mockup="${h(image)}" aria-label="ເບິ່ງ mockup ${index + 1}">
+                <img src="${h(image)}" alt="Mockup ${index + 1}" />
+              </button>
+            `).join("")}
+          </div>
+        ` : ""}
+      </div>
     `;
   }
   return `

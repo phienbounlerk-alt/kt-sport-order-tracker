@@ -14,5 +14,8 @@
   "totalAmount": 6525000,
   "depositAmount": 3000000,
   "mockupImage": "published/mockups/9tytewub7t.jpg",
-  "note": ""
+  "note": "",
+  "mockupImages": [
+    "published/mockups/9tytewub7t.jpg"
+  ]
 }
