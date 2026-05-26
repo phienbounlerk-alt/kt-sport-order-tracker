@@ -5,12 +5,16 @@ const path = require("path");
 
 const rootDir = __dirname;
 const seedDataFile = path.join(rootDir, "data", "orders.json");
+const seedCatalogFile = path.join(rootDir, "data", "catalog.json");
+const seedSettingsFile = path.join(rootDir, "data", "settings.json");
 const persistentDataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : "";
 const dataFile = process.env.DATA_FILE
   ? path.resolve(process.env.DATA_FILE)
   : persistentDataDir
     ? path.join(persistentDataDir, "orders.json")
     : seedDataFile;
+const catalogFile = persistentDataDir ? path.join(persistentDataDir, "catalog.json") : seedCatalogFile;
+const settingsFile = persistentDataDir ? path.join(persistentDataDir, "settings.json") : seedSettingsFile;
 const uploadsDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : persistentDataDir
@@ -127,6 +131,34 @@ function normalizeProduct(product, index) {
   };
 }
 
+function normalizeAdminName(name, index) {
+  const fallback = `Admin ${index + 1}`;
+  return String(name || fallback).trim().slice(0, 40) || fallback;
+}
+
+function normalizeSettings(settings = {}) {
+  const names = Array.isArray(settings.adminNames) ? settings.adminNames : [];
+  return {
+    adminNames: Array.from({ length: 10 }, (_, index) => normalizeAdminName(names[index], index)),
+    shopPhone: String(settings.shopPhone || "8562077728239").replace(/\D/g, "") || "8562077728239",
+  };
+}
+
+function normalizeCatalogItem(item = {}, index) {
+  const price = Math.max(0, toNumber(item.price, 0));
+  return {
+    id: String(item.id || `KT-${String(index + 1).padStart(4, "0")}`).trim(),
+    name: String(item.name || `ສິນຄ້າ ${index + 1}`).trim(),
+    category: String(item.category || "ສິນຄ້າ").trim(),
+    image: String(item.image || "./assets/kt-sport-logo.jpg").trim(),
+    price,
+    moq: Math.max(1, toNumber(item.moq, 1)),
+    size: String(item.size || "Free size").trim(),
+    sold: Math.max(0, toNumber(item.sold, 0)),
+    visible: item.visible !== false,
+  };
+}
+
 function normalizeOrder(payload, existingOrder = {}) {
   const products = Array.isArray(payload.products) && payload.products.length > 0 ? payload.products : [];
   const productionStatus = validStatuses.has(payload.productionStatus)
@@ -154,6 +186,7 @@ function normalizeOrder(payload, existingOrder = {}) {
     customerName: String(payload.customerName || existingOrder.customerName || "ບໍ່ລະບຸຊື່...").trim(),
     phone: String(payload.phone || existingOrder.phone || "-").trim(),
     addressCf: String(payload.addressCf || existingOrder.addressCf || "-").trim(),
+    assignedAdmin: String(payload.assignedAdmin || existingOrder.assignedAdmin || "Admin 1").trim(),
     productionStatus,
     productImage: String(
       payload.productImage ||
@@ -166,21 +199,53 @@ function normalizeOrder(payload, existingOrder = {}) {
   };
 }
 
-async function readOrders() {
+async function ensureJsonFile(file, seedFile) {
   try {
-    await fs.access(dataFile);
+    await fs.access(file);
   } catch {
-    await fs.mkdir(path.dirname(dataFile), { recursive: true });
-    const seed = await fs.readFile(seedDataFile, "utf8");
-    await fs.writeFile(dataFile, seed);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const seed = await fs.readFile(seedFile, "utf8");
+    await fs.writeFile(file, seed);
   }
+}
+
+async function readOrders() {
+  await ensureJsonFile(dataFile, seedDataFile);
   const raw = await fs.readFile(dataFile, "utf8");
-  return JSON.parse(raw);
+  const orders = JSON.parse(raw);
+  for (const [code, order] of Object.entries(orders)) {
+    if (!order.assignedAdmin) orders[code] = { ...order, assignedAdmin: "Admin 1" };
+  }
+  return orders;
 }
 
 async function writeOrders(orders) {
   await fs.mkdir(path.dirname(dataFile), { recursive: true });
   await fs.writeFile(dataFile, `${JSON.stringify(orders, null, 2)}\n`);
+}
+
+async function readSettings() {
+  await ensureJsonFile(settingsFile, seedSettingsFile);
+  const raw = await fs.readFile(settingsFile, "utf8");
+  return normalizeSettings(JSON.parse(raw));
+}
+
+async function writeSettings(settings) {
+  await fs.mkdir(path.dirname(settingsFile), { recursive: true });
+  await fs.writeFile(settingsFile, `${JSON.stringify(normalizeSettings(settings), null, 2)}\n`);
+}
+
+async function readCatalog() {
+  await ensureJsonFile(catalogFile, seedCatalogFile);
+  const raw = await fs.readFile(catalogFile, "utf8");
+  const data = JSON.parse(raw);
+  return Array.isArray(data) ? data.map(normalizeCatalogItem).slice(0, 500) : [];
+}
+
+async function writeCatalog(catalog) {
+  await fs.mkdir(path.dirname(catalogFile), { recursive: true });
+  const data = Array.isArray(catalog) ? catalog.map(normalizeCatalogItem).slice(0, 500) : [];
+  await fs.writeFile(catalogFile, `${JSON.stringify(data, null, 2)}\n`);
 }
 
 async function readStaticFile(filePath, res) {
@@ -236,7 +301,7 @@ async function handleApi(req, res, url) {
       res.end();
       return;
     }
-    return sendJson(res, 200, { ok: true, dataFile, uploadsDir });
+    return sendJson(res, 200, { ok: true, dataFile, catalogFile, settingsFile, uploadsDir });
   }
 
   if (req.method === "POST" && url.pathname === "/api/login") {
@@ -280,6 +345,35 @@ async function handleApi(req, res, url) {
     const filePath = path.join(uploadsDir, filename);
     await fs.writeFile(filePath, buffer);
     return sendJson(res, 201, { url: `/uploads/${filename}` });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/settings") {
+    const settings = await readSettings();
+    return sendJson(res, 200, { data: settings });
+  }
+
+  if (req.method === "PUT" && url.pathname === "/api/settings") {
+    if (!requireAuth(req, res)) return;
+    const payload = await collectJson(req);
+    await writeSettings(payload);
+    return sendJson(res, 200, { data: await readSettings() });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/catalog") {
+    const catalog = await readCatalog();
+    return sendJson(res, 200, { data: catalog.filter((item) => item.visible !== false) });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/admin/catalog") {
+    if (!requireAuth(req, res)) return;
+    return sendJson(res, 200, { data: await readCatalog() });
+  }
+
+  if (req.method === "PUT" && url.pathname === "/api/admin/catalog") {
+    if (!requireAuth(req, res)) return;
+    const payload = await collectJson(req);
+    await writeCatalog(payload.data || payload.catalog || []);
+    return sendJson(res, 200, { data: await readCatalog() });
   }
 
   if (req.method === "GET" && url.pathname === "/api/orders") {
@@ -423,6 +517,8 @@ async function start() {
   await fs.mkdir(path.dirname(dataFile), { recursive: true });
   await fs.mkdir(uploadsDir, { recursive: true });
   await readOrders();
+  await readCatalog();
+  await readSettings();
   server.listen(port, "0.0.0.0", () => {
     console.log(`KT SPORT server running at http://0.0.0.0:${port}`);
     console.log(`Data file: ${dataFile}`);

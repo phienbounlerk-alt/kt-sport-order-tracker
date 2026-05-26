@@ -15,6 +15,10 @@ const productionSteps = [
 
 let orders = [];
 let activeCode = null;
+let settings = { adminNames: Array.from({ length: 10 }, (_, index) => `Admin ${index + 1}`), shopPhone: "8562077728239" };
+let activeMenu = "ALL";
+let catalogItems = [];
+let catalogSearch = "";
 let filters = {
   search: "",
   status: "ALL",
@@ -35,6 +39,7 @@ const emptyProduct = () => ({
 const emptyOrder = () => ({
   code: "",
   depositStatus: "PENDING",
+  assignedAdmin: settings.adminNames[0],
   customerName: "",
   phone: "",
   addressCf: "",
@@ -83,6 +88,10 @@ function setAdminNotice(message, tone = "muted") {
   notice.dataset.tone = tone;
 }
 
+function setCatalogNotice(message, tone = "muted") {
+  setAdminNotice(message, tone);
+}
+
 async function ensureSession() {
   const response = await fetch("/api/session");
   const result = await response.json();
@@ -105,6 +114,14 @@ function totalFor(order) {
   return (order.products || []).reduce((sum, product) => sum + Number(product.totalPrice || 0), 0);
 }
 
+function renderAssignedAdminSelect(selected = settings.adminNames[0]) {
+  const select = document.querySelector("#assignedAdminInput");
+  select.innerHTML = settings.adminNames
+    .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+    .join("");
+  select.value = settings.adminNames.includes(selected) ? selected : settings.adminNames[0];
+}
+
 function activeOrder() {
   return orders.find((order) => order.code === activeCode) || null;
 }
@@ -119,8 +136,44 @@ function filteredOrders() {
         .some((value) => String(value).toLowerCase().includes(search));
     const matchesStatus = filters.status === "ALL" || order.productionStatus === filters.status;
     const matchesDeposit = filters.deposit === "ALL" || order.depositStatus === filters.deposit;
-    return matchesSearch && matchesStatus && matchesDeposit;
+    const matchesAdmin = activeMenu === "ALL" || activeMenu === "CATALOG" || order.assignedAdmin === activeMenu;
+    return matchesSearch && matchesStatus && matchesDeposit && matchesAdmin;
   });
+}
+
+function renderAdminMenu() {
+  const counts = settings.adminNames.map((name) => orders.filter((order) => order.assignedAdmin === name).length);
+  document.querySelector("#adminMenuTabs").innerHTML = [
+    `<button class="admin-menu-tab ${activeMenu === "ALL" ? "active" : ""}" data-admin-menu="ALL" type="button">
+      <strong>ອໍເດີ້ທັງໝົດ</strong><span>${orders.length}</span>
+    </button>`,
+    ...settings.adminNames.map(
+      (name, index) => `
+        <div class="admin-menu-tab admin-name-tab ${activeMenu === name ? "active" : ""}" data-admin-menu="${escapeHtml(name)}">
+          <input data-admin-name-index="${index}" value="${escapeHtml(name)}" aria-label="Admin ${index + 1}" />
+          <button type="button" data-admin-menu="${escapeHtml(name)}">${counts[index]}</button>
+        </div>
+      `,
+    ),
+    `<button class="admin-menu-tab ${activeMenu === "CATALOG" ? "active" : ""}" data-admin-menu="CATALOG" type="button">
+      <strong>ສິນຄ້າ 500</strong><span>${catalogItems.length || 500}</span>
+    </button>`,
+  ].join("");
+}
+
+function setAdminView(menu) {
+  activeMenu = menu;
+  const catalogMode = activeMenu === "CATALOG";
+  document.querySelector("#ordersPanel").hidden = catalogMode;
+  document.querySelector("#orderEditorPanel").hidden = catalogMode;
+  document.querySelector("#catalogPanel").hidden = !catalogMode;
+  document.querySelector("#newOrderButton").hidden = catalogMode;
+  renderAdminMenu();
+  if (catalogMode) {
+    renderCatalogEditor();
+  } else {
+    renderOrdersList();
+  }
 }
 
 function renderStats() {
@@ -136,6 +189,7 @@ function renderStats() {
     ["ສຳເລັດ", completedOrders],
     ["ຄ້າງຊຳລະ", pendingPayments],
     ["ມູນຄ່າລວມ", money(totalValue)],
+    ["Admin", activeMenu === "ALL" || activeMenu === "CATALOG" ? "ທັງໝົດ" : activeMenu],
   ]
     .map(
       ([label, value]) => `
@@ -152,6 +206,7 @@ function renderOrdersList() {
   const list = document.querySelector("#ordersList");
   const visibleOrders = filteredOrders();
   renderStats();
+  renderAdminMenu();
 
   if (!visibleOrders.length) {
     list.innerHTML = `<p class="empty-state">ບໍ່ພົບບິນທີ່ກົງກັບ filter</p>`;
@@ -164,7 +219,7 @@ function renderOrdersList() {
         <button class="order-list-item ${order.code === activeCode ? "active" : ""}" data-code="${order.code}" type="button">
           <strong>${escapeHtml(order.code)}</strong>
           <span>${escapeHtml(order.customerName || "ບໍ່ລະບຸຊື່")} · ${money(totalFor(order))}</span>
-          <small>${escapeHtml(statusLabel(order.productionStatus))} · ${escapeHtml(depositLabel(order.depositStatus))}</small>
+          <small>${escapeHtml(order.assignedAdmin || "Admin 1")} · ${escapeHtml(statusLabel(order.productionStatus))} · ${escapeHtml(depositLabel(order.depositStatus))}</small>
         </button>
       `,
     )
@@ -342,6 +397,7 @@ function fillForm(order) {
   document.querySelector("#codeInput").disabled = Boolean(activeCode);
   document.querySelector("#depositStatusInput").value = order.depositStatus || "PENDING";
   document.querySelector("#receiveDateInput").value = toDateInput(order.receiveDate);
+  renderAssignedAdminSelect(order.assignedAdmin || settings.adminNames[0]);
   document.querySelector("#customerNameInput").value = order.customerName || "";
   document.querySelector("#phoneInput").value = order.phone || "";
   document.querySelector("#addressInput").value = order.addressCf || "";
@@ -369,6 +425,7 @@ function collectOrderPayload() {
     code: document.querySelector("#codeInput").value.trim().toUpperCase(),
     depositStatus: document.querySelector("#depositStatusInput").value,
     receiveDate: receiveDate ? `${receiveDate}T00:00:00` : null,
+    assignedAdmin: document.querySelector("#assignedAdminInput").value || settings.adminNames[0],
     customerName: document.querySelector("#customerNameInput").value.trim(),
     phone: document.querySelector("#phoneInput").value.trim(),
     addressCf: document.querySelector("#addressInput").value.trim(),
@@ -393,6 +450,139 @@ async function loadOrders() {
     if (selectedOrder) fillForm(selectedOrder);
   }
   setAdminNotice("ດຶງຂໍ້ມູນສຳເລັດ", "success");
+}
+
+async function loadSettings() {
+  const response = await fetch("/api/settings");
+  if (!response.ok) throw new Error("SETTINGS_FAILED");
+  const result = await response.json();
+  settings = result.data;
+  renderAssignedAdminSelect(settings.adminNames[0]);
+  renderAdminMenu();
+}
+
+async function saveSettings() {
+  const response = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (response.status === 401) {
+    window.location.href = "/login.html";
+    return;
+  }
+  if (!response.ok) {
+    setAdminNotice("ບັນທຶກຊື່ Admin ບໍ່ສຳເລັດ", "error");
+    return;
+  }
+  const result = await response.json();
+  settings = result.data;
+  if (activeMenu !== "CATALOG" && activeMenu !== "ALL" && !settings.adminNames.includes(activeMenu)) {
+    activeMenu = settings.adminNames[0];
+  }
+  renderAssignedAdminSelect(document.querySelector("#assignedAdminInput").value);
+  renderOrdersList();
+  setAdminNotice("ບັນທຶກຊື່ Admin ສຳເລັດ", "success");
+}
+
+async function renameAssignedOrders(previousName, nextName) {
+  const changedOrders = orders.filter((order) => order.assignedAdmin === nextName && previousName !== nextName);
+  for (const order of changedOrders) {
+    await fetch(`/api/orders/${encodeURIComponent(order.code)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(order),
+    });
+  }
+}
+
+async function loadCatalog() {
+  const response = await fetch("/api/admin/catalog");
+  if (response.status === 401) {
+    window.location.href = "/login.html";
+    return;
+  }
+  if (!response.ok) throw new Error("CATALOG_FAILED");
+  const result = await response.json();
+  catalogItems = result.data;
+  renderAdminMenu();
+}
+
+function catalogVisibleItems() {
+  const search = catalogSearch.trim().toLowerCase();
+  return catalogItems.filter((item) => {
+    if (!search) return true;
+    return [item.id, item.name, item.category].some((value) => String(value || "").toLowerCase().includes(search));
+  });
+}
+
+function renderCatalogEditor() {
+  const items = catalogVisibleItems();
+  document.querySelector("#catalogCountLabel").textContent = `${items.length} / ${catalogItems.length} ລາຍການ`;
+  document.querySelector("#catalogEditor").innerHTML = items
+    .slice(0, 500)
+    .map(
+      (item) => `
+        <article class="catalog-edit-row" data-catalog-id="${escapeHtml(item.id)}">
+          <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" onerror="this.src='./assets/kt-sport-logo.jpg'" />
+          <div class="catalog-edit-grid">
+            <label>ID<input data-catalog-field="id" value="${escapeHtml(item.id)}" /></label>
+            <label>ຊື່<input data-catalog-field="name" value="${escapeHtml(item.name)}" /></label>
+            <label>ໝວດ<input data-catalog-field="category" value="${escapeHtml(item.category)}" /></label>
+            <label>ລາຄາ<input data-catalog-field="price" type="number" min="0" value="${item.price || 0}" /></label>
+            <label>MOQ<input data-catalog-field="moq" type="number" min="1" value="${item.moq || 1}" /></label>
+            <label>ໄຊ້<input data-catalog-field="size" value="${escapeHtml(item.size)}" /></label>
+            <label class="full-span">ຮູບ URL<input data-catalog-field="image" value="${escapeHtml(item.image)}" /></label>
+            <label class="catalog-visible"><input data-catalog-field="visible" type="checkbox" ${item.visible !== false ? "checked" : ""} /> ສະແດງໃນ shop</label>
+            <button type="button" data-remove-catalog="${escapeHtml(item.id)}">ລົບ</button>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function syncCatalogRow(row) {
+  const originalId = row.dataset.catalogId;
+  const item = catalogItems.find((entry) => entry.id === originalId);
+  if (!item) return;
+  const get = (field) => row.querySelector(`[data-catalog-field="${field}"]`);
+  item.id = get("id").value.trim() || originalId;
+  item.name = get("name").value.trim();
+  item.category = get("category").value.trim() || "ສິນຄ້າ";
+  item.price = Math.max(0, Number(get("price").value) || 0);
+  item.moq = Math.max(1, Number(get("moq").value) || 1);
+  item.size = get("size").value.trim() || "Free size";
+  item.image = get("image").value.trim() || "./assets/kt-sport-logo.jpg";
+  item.visible = get("visible").checked;
+  row.dataset.catalogId = item.id;
+}
+
+function syncCatalogFromDom() {
+  document.querySelectorAll(".catalog-edit-row").forEach(syncCatalogRow);
+}
+
+async function saveCatalog() {
+  syncCatalogFromDom();
+  setCatalogNotice("ກຳລັງບັນທຶກ shop...", "muted");
+  const response = await fetch("/api/admin/catalog", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: catalogItems.slice(0, 500) }),
+  });
+  if (response.status === 401) {
+    window.location.href = "/login.html";
+    return;
+  }
+  if (!response.ok) {
+    setCatalogNotice("ບັນທຶກສິນຄ້າບໍ່ສຳເລັດ", "error");
+    return;
+  }
+  const result = await response.json();
+  catalogItems = result.data;
+  renderCatalogEditor();
+  renderAdminMenu();
+  setCatalogNotice("ບັນທຶກສິນຄ້າ shop ສຳເລັດ", "success");
 }
 
 async function saveOrder(event) {
@@ -493,6 +683,22 @@ function setupAdmin() {
   document.querySelector("#updateWorkflowButton").addEventListener("click", updateWorkflowStatus);
   document.querySelector("#copyTrackingButton").addEventListener("click", copyTrackingLink);
   document.querySelector("#logoutButton").addEventListener("click", logout);
+  document.querySelector("#adminMenuTabs").addEventListener("click", (event) => {
+    const menuButton = event.target.closest("[data-admin-menu]");
+    if (!menuButton || event.target.matches("[data-admin-name-index]")) return;
+    setAdminView(menuButton.dataset.adminMenu);
+  });
+  document.querySelector("#adminMenuTabs").addEventListener("change", (event) => {
+    const input = event.target.closest("[data-admin-name-index]");
+    if (!input) return;
+    const index = Number(input.dataset.adminNameIndex);
+    const previousName = settings.adminNames[index];
+    const nextName = input.value.trim() || `Admin ${index + 1}`;
+    settings.adminNames[index] = nextName;
+    orders = orders.map((order) => (order.assignedAdmin === previousName ? { ...order, assignedAdmin: nextName } : order));
+    activeMenu = activeMenu === previousName ? nextName : activeMenu;
+    saveSettings().then(() => renameAssignedOrders(previousName, nextName)).then(loadOrders);
+  });
   document.querySelector("#orderSearchInput").addEventListener("input", (event) => {
     filters.search = event.target.value;
     renderOrdersList();
@@ -535,10 +741,46 @@ function setupAdmin() {
     if (!input) return;
     uploadProductImage(input).catch(() => setAdminNotice("Upload ຮູບບໍ່ສຳເລັດ", "error"));
   });
+  document.querySelector("#catalogSearchInput").addEventListener("input", (event) => {
+    syncCatalogFromDom();
+    catalogSearch = event.target.value;
+    renderCatalogEditor();
+  });
+  document.querySelector("#addCatalogItemButton").addEventListener("click", () => {
+    syncCatalogFromDom();
+    const nextNumber = catalogItems.length + 1;
+    catalogItems.unshift({
+      id: `KT-${String(nextNumber).padStart(4, "0")}`,
+      name: `ສິນຄ້າໃໝ່ ${nextNumber}`,
+      category: "ສິນຄ້າ",
+      image: "./assets/kt-sport-logo.jpg",
+      price: 0,
+      moq: 1,
+      size: "Free size",
+      sold: 0,
+      visible: true,
+    });
+    renderCatalogEditor();
+  });
+  document.querySelector("#saveCatalogButton").addEventListener("click", saveCatalog);
+  document.querySelector("#catalogEditor").addEventListener("input", (event) => {
+    const row = event.target.closest(".catalog-edit-row");
+    if (row) syncCatalogRow(row);
+  });
+  document.querySelector("#catalogEditor").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-catalog]");
+    if (!button) return;
+    catalogItems = catalogItems.filter((item) => item.id !== button.dataset.removeCatalog);
+    renderCatalogEditor();
+  });
 
-  fillForm(emptyOrder());
   ensureSession();
-  loadOrders().catch(() => setAdminNotice("ດຶງຂໍ້ມູນບໍ່ໄດ້", "error"));
+  Promise.all([loadSettings(), loadCatalog()])
+    .then(() => {
+      fillForm(emptyOrder());
+      return loadOrders();
+    })
+    .catch(() => setAdminNotice("ດຶງຂໍ້ມູນບໍ່ໄດ້", "error"));
 }
 
 setupAdmin();

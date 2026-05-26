@@ -552,9 +552,82 @@ textarea {
 
 .admin-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.admin-menu-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.admin-menu-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-menu-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.admin-menu-tab {
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-menu-tab.active {
+  border-color: var(--main);
+  background: #fff0f0;
+}
+
+.admin-menu-tab span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-name-tab {
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+}
+
+.admin-name-tab input {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.admin-name-tab button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--main);
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .stat-tile {
@@ -615,6 +688,10 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
+}
+
+[hidden] {
+  display: none !important;
 }
 
 .admin-list-panel {
@@ -928,6 +1005,104 @@ textarea {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.muted-copy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.catalog-admin-panel {
+  grid-column: 1 / -1;
+}
+
+.catalog-admin-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.catalog-admin-tools input,
+.catalog-edit-grid input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: white;
+  color: var(--ink);
+}
+
+.catalog-admin-tools span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.catalog-editor {
+  display: grid;
+  gap: 10px;
+  max-height: 760px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.catalog-edit-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.catalog-edit-row > img {
+  width: 96px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #edf2f5;
+}
+
+.catalog-edit-grid {
+  display: grid;
+  grid-template-columns: 120px minmax(180px, 1.2fr) minmax(130px, 0.8fr) 100px 80px 110px;
+  gap: 8px;
+  align-items: end;
+}
+
+.catalog-edit-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.catalog-visible {
+  display: flex !important;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.catalog-visible input {
+  width: auto;
+  min-height: auto;
+}
+
+.catalog-edit-grid button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #fee4e2;
+  color: #b42318;
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .workflow-controls select,
@@ -1385,9 +1560,13 @@ textarea {
   .admin-layout,
   .form-grid,
   .workflow-controls,
+  .admin-menu-panel,
   .shop-hero,
   .shop-controls,
-  .catalog-layout {
+  .catalog-layout,
+  .catalog-admin-tools,
+  .catalog-edit-row,
+  .catalog-edit-grid {
     grid-template-columns: 1fr;
   }
 

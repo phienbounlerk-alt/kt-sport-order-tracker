@@ -20,6 +20,7 @@
       </a>
       <nav class="nav-actions" aria-label="Admin navigation">
         <a class="nav-link" href="./index.html">Tracking</a>
+        <a class="nav-link" href="./shop.html">Shop</a>
         <button id="logoutButton" class="icon-button" type="button" title="Logout">⏻</button>
       </nav>
     </header>
@@ -35,8 +36,16 @@
 
       <section id="adminStats" class="admin-stats" aria-label="Order summary"></section>
 
+      <section class="admin-menu-panel" aria-label="Admin menu">
+        <div>
+          <p class="eyebrow">Team Menu</p>
+          <h2>ແບ່ງອໍເດີ້ຕາມ Admin ແລະ ຈັດການສິນຄ້າ</h2>
+        </div>
+        <div id="adminMenuTabs" class="admin-menu-tabs"></div>
+      </section>
+
       <section class="admin-layout">
-        <aside class="admin-list-panel">
+        <aside id="ordersPanel" class="admin-list-panel">
           <div class="panel-title-row">
             <h2>ລາຍການບິນ</h2>
             <button id="refreshOrdersButton" type="button" title="Refresh">↻</button>
@@ -55,7 +64,7 @@
           <div id="ordersList" class="orders-list"></div>
         </aside>
 
-        <section class="admin-form-panel">
+        <section id="orderEditorPanel" class="admin-form-panel">
           <div class="panel-title-row">
             <h2 id="formTitle">ສ້າງບິນໃໝ່</h2>
             <div class="link-actions">
@@ -80,6 +89,10 @@
               <label>
                 ວັນທີຮັບເຄື່ອງ
                 <input id="receiveDateInput" name="receiveDate" type="date" />
+              </label>
+              <label>
+                Admin ຜູ້ຮັບຜິດຊອບ
+                <select id="assignedAdminInput" name="assignedAdmin"></select>
               </label>
               <label>
                 ຊື່ລູກຄ້າ
@@ -125,6 +138,24 @@
             </div>
             <ol id="workflowHistory" class="workflow-history"></ol>
           </section>
+        </section>
+
+        <section id="catalogPanel" class="admin-form-panel catalog-admin-panel" hidden>
+          <div class="panel-title-row">
+            <div>
+              <h2>ຈັດການສິນຄ້າຮ້ານ 500 ລາຍການ</h2>
+              <p class="muted-copy">ແກ້ຊື່, ຮູບ, ໝວດ, ລາຄາ, MOQ, ໄຊ້ ແລ້ວກົດບັນທຶກເພື່ອໃຫ້ໜ້າ shop ອັບເດດ.</p>
+            </div>
+            <div class="link-actions">
+              <button id="addCatalogItemButton" type="button">ເພີ່ມສິນຄ້າ</button>
+              <button id="saveCatalogButton" type="button">ບັນທຶກ shop</button>
+            </div>
+          </div>
+          <div class="catalog-admin-tools">
+            <input id="catalogSearchInput" placeholder="ຄົ້ນຫາ ID, ຊື່, ໝວດ" />
+            <span id="catalogCountLabel">0 ລາຍການ</span>
+          </div>
+          <div id="catalogEditor" class="catalog-editor"></div>
         </section>
       </section>
     </main>

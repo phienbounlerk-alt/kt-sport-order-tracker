@@ -52,6 +52,7 @@ const productSeeds = [
 const colors = ["ແດງ", "ນ້ຳເງິນ", "ດຳ", "ຂາວ", "ເຫຼືອງ", "ຂຽວ", "ສົ້ມ", "ຟ້າ"];
 const sizes = ["S-3XL", "M-4XL", "Kids", "Women", "Men", "Free size"];
 const cartKey = "kt_sport_cart";
+let shopPhone = "8562077728239";
 let visibleLimit = 24;
 let cart = JSON.parse(localStorage.getItem(cartKey) || "{}");
 
@@ -62,7 +63,7 @@ const currency = (value) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const products = Array.from({ length: 500 }, (_, index) => {
+let products = Array.from({ length: 500 }, (_, index) => {
   const seed = productSeeds[index % productSeeds.length];
   const color = colors[index % colors.length];
   const variant = Math.floor(index / productSeeds.length) + 1;
@@ -78,6 +79,25 @@ const products = Array.from({ length: 500 }, (_, index) => {
     sold: 1200 - index,
   };
 });
+
+async function loadShopData() {
+  try {
+    const [catalogResponse, settingsResponse] = await Promise.all([fetch("/api/catalog"), fetch("/api/settings")]);
+    if (catalogResponse.ok) {
+      const result = await catalogResponse.json();
+      if (Array.isArray(result.data) && result.data.length) products = result.data;
+    }
+    if (settingsResponse.ok) {
+      const result = await settingsResponse.json();
+      shopPhone = String(result.data?.shopPhone || shopPhone).replace(/\D/g, "") || shopPhone;
+    }
+    document.querySelectorAll('a[href^="https://wa.me/"]').forEach((link) => {
+      link.href = `https://wa.me/${shopPhone}`;
+    });
+  } catch {
+    shopPhone = "8562077728239";
+  }
+}
 
 function saveCart() {
   localStorage.setItem(cartKey, JSON.stringify(cart));
@@ -102,7 +122,9 @@ function filteredProducts() {
 function renderCategories() {
   const select = document.querySelector("#categoryFilter");
   const categories = [...new Set(products.map((product) => product.category))];
-  select.innerHTML += categories.map((category) => `<option value="${category}">${category}</option>`).join("");
+  select.innerHTML =
+    '<option value="ALL">ທຸກໝວດ</option>' +
+    categories.map((category) => `<option value="${category}">${category}</option>`).join("");
 }
 
 function renderProducts() {
@@ -181,10 +203,11 @@ function checkout() {
   const lines = items.map((item) => `- ${item.id} ${item.name} x${item.qty} = ${currency(item.price * item.qty)}`);
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const text = encodeURIComponent(`ສະບາຍດີ KT SPORT, ຂ້ອຍສົນໃຈສັ່ງສິນຄ້າ:\n${lines.join("\n")}\nລວມ: ${currency(total)}`);
-  window.open(`https://wa.me/8562029933696?text=${text}`, "_blank", "noopener");
+  window.open(`https://wa.me/${shopPhone}?text=${text}`, "_blank", "noopener");
 }
 
-function setupShop() {
+async function setupShop() {
+  await loadShopData();
   renderCategories();
   renderProducts();
   renderCart();
