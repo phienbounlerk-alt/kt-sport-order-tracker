@@ -822,9 +822,7 @@ textarea {
   background: white;
 }
 
-.role-photo-picker::after,
-.staff-photo-picker::after {
-  content: "+";
+.photo-upload-button {
   position: absolute;
   right: 3px;
   bottom: 3px;
@@ -839,8 +837,7 @@ textarea {
   box-shadow: 0 6px 14px rgba(207, 44, 39, 0.24);
 }
 
-.role-photo-picker input,
-.staff-photo-picker input {
+.photo-upload-button input {
   position: absolute;
   width: 1px;
   height: 1px;

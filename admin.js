@@ -202,10 +202,13 @@ function renderRoleMenu() {
     .map(
       (role, index) => `
         <div class="role-menu-card ${selectedRole === role.key && !staffPanelOpen ? "active" : ""}" data-role-key="${role.key}" role="button" tabindex="0">
-          <label class="role-photo-picker" title="Upload photo">
+          <div class="role-photo-picker">
             <img src="${escapeHtml(settings.rolePhotos?.[role.key] || "./assets/kt-sport-logo.jpg")}" alt="${escapeHtml(roleDisplay(role))}" />
-            <input data-role-photo-key="${role.key}" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-          </label>
+            <label class="photo-upload-button" title="Upload photo">
+              +
+              <input data-role-photo-key="${role.key}" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            </label>
+          </div>
           <strong>${role.title}</strong>
           ${role.name ? `<small>${role.name}</small>` : ""}
         </div>
@@ -213,10 +216,13 @@ function renderRoleMenu() {
     ),
     `
       <div class="role-menu-card ${staffPanelOpen ? "active" : ""}" data-staff-menu role="button" tabindex="0">
-        <label class="role-photo-picker" title="Upload photo">
+        <div class="role-photo-picker">
           <img src="${escapeHtml(settings.rolePhotos?.staff || "./assets/kt-sport-logo.jpg")}" alt="ພະນັກງານ" />
-          <input data-role-photo-key="staff" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-        </label>
+          <label class="photo-upload-button" title="Upload photo">
+            +
+            <input data-role-photo-key="staff" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+          </label>
+        </div>
         <strong>ພະນັກງານ</strong>
         <small>${staffMembers.length} ຄົນ</small>
       </div>
@@ -245,10 +251,13 @@ function renderStaffPanel() {
         .map(
           ([name, birthDate], index) => `
             <article class="staff-card">
-              <label class="staff-photo-picker" title="Upload photo">
+              <div class="staff-photo-picker">
                 <img src="${escapeHtml(settings.staffPhotos?.[index] || "./assets/kt-sport-logo.jpg")}" alt="${escapeHtml(name)}" />
-                <input data-staff-photo-index="${index}" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-              </label>
+                <label class="photo-upload-button" title="Upload photo">
+                  +
+                  <input data-staff-photo-index="${index}" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+                </label>
+              </div>
               <strong>${escapeHtml(name.toUpperCase())}</strong>
               <span>${escapeHtml(birthDate)}</span>
             </article>
@@ -1239,7 +1248,7 @@ function setupAdmin() {
   document.querySelector("#logoutButton").addEventListener("click", logout);
   document.querySelector("#changeRoleButton").addEventListener("click", lockRoleWorkspace);
   document.querySelector("#roleMenuTabs").addEventListener("click", (event) => {
-    if (event.target.matches("input[type='file']") || event.target.closest(".role-photo-picker")) return;
+    if (event.target.matches("input[type='file']") || event.target.closest(".photo-upload-button")) return;
     const staffButton = event.target.closest("[data-staff-menu]");
     if (staffButton) {
       staffPanelOpen = true;
