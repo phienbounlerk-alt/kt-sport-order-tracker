@@ -1,13 +1,15 @@
 const productionSteps = [
   { key: "PRODUCTION_ORDER", label: "ອອກບິນຜະລິດ", icon: "▤" },
+  { key: "DESIGN", label: "ອອກແບບ", icon: "✎" },
   { key: "PATTERN", label: "ກຳລັງຂຶ້ນແພັດເທິ້ນ", icon: "□" },
   { key: "PRINTING", label: "ກຳລັງພິມ", icon: "▣" },
   { key: "HEAT_TRANSFER", label: "ກຳລັງລີດລົງຜ້າ", icon: "⚙" },
   { key: "CUTTING", label: "ກຳລັງຕັດ", icon: "✂" },
+  { key: "QC_BEFORE_SEWING", label: "QC ກ່ອນຫຍິບ", icon: "✓" },
   { key: "SEWING", label: "ກຳລັງຍິບ", icon: "⚒" },
-  { key: "QC", label: "QC", icon: "✓" },
-  { key: "READY_TO_COMPLETE", label: "ຢືນຢັນລູກຄ້າຮັບເຄື່ອງ", icon: "▢" },
-  { key: "COMPLETED", label: "ສຳເລັດ", icon: "⚑" },
+  { key: "QC_AFTER_SEWING", label: "QC ຫຼັງຫຍິບ", icon: "✓" },
+  { key: "DELIVERY", label: "ຂົນສົ່ງ", icon: "▢" },
+  { key: "COMPLETED", label: "ສຳເລັດແລ້ວ", icon: "⚑" },
 ];
 
 const pad = (value) => String(value).padStart(2, "0");
@@ -127,13 +129,29 @@ function renderOrder(order) {
   `;
   document.querySelector("#publicHistoryList").innerHTML = (order.productionHistory || [])
     .map(
-      (item) => `
+      (item) => {
+        const historyImages = Array.isArray(item.images) ? item.images : [];
+        return `
         <li>
           <strong>${escapeHtml(statusLabel(item.status))}</strong>
           <span>${formatDateTime(item.createdAt)}</span>
           ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ""}
+          ${
+            historyImages.length
+              ? `<div class="history-gallery">${historyImages
+                  .map(
+                    (image) => `
+                      <a href="${escapeHtml(image)}" target="_blank">
+                        <img src="${escapeHtml(image)}" alt="${escapeHtml(statusLabel(item.status))}" onerror="this.src='./assets/kt-sport-logo.jpg'" />
+                      </a>
+                    `,
+                  )
+                  .join("")}</div>`
+              : ""
+          }
         </li>
-      `,
+      `;
+      },
     )
     .join("");
 

@@ -3,14 +3,16 @@ const defaultProductImage =
 
 const productionSteps = [
   { key: "PRODUCTION_ORDER", label: "ອອກບິນຜະລິດ" },
+  { key: "DESIGN", label: "ອອກແບບ" },
   { key: "PATTERN", label: "ກຳລັງຂຶ້ນແພັດເທິ້ນ" },
   { key: "PRINTING", label: "ກຳລັງພິມ" },
   { key: "HEAT_TRANSFER", label: "ກຳລັງລີດລົງຜ້າ" },
   { key: "CUTTING", label: "ກຳລັງຕັດ" },
+  { key: "QC_BEFORE_SEWING", label: "QC ກ່ອນຫຍິບ" },
   { key: "SEWING", label: "ກຳລັງຍິບ" },
-  { key: "QC", label: "QC" },
-  { key: "READY_TO_COMPLETE", label: "ຢືນຢັນລູກຄ້າຮັບເຄື່ອງ" },
-  { key: "COMPLETED", label: "ສຳເລັດ" },
+  { key: "QC_AFTER_SEWING", label: "QC ຫຼັງຫຍິບ" },
+  { key: "DELIVERY", label: "ຂົນສົ່ງ" },
+  { key: "COMPLETED", label: "ສຳເລັດແລ້ວ" },
 ];
 
 let orders = [];
@@ -233,21 +235,65 @@ function renderWorkflow(order) {
   document.querySelector("#updateWorkflowButton").disabled = !order?.code;
   document.querySelector("#workflowNoteInput").disabled = !order?.code;
   document.querySelector("#workflowStatusSelect").disabled = !order?.code;
+  document.querySelector("#workflowImagesInput").disabled = !order?.code;
 
   const history = Array.isArray(order?.productionHistory) ? order.productionHistory : [];
   document.querySelector("#workflowHistory").innerHTML = history.length
     ? history
-        .map(
-          (item) => `
+        .map((item) => {
+          const images = Array.isArray(item.images) ? item.images : [];
+          return `
             <li>
               <strong>${escapeHtml(statusLabel(item.status))}</strong>
               <span>${formatDateTime(item.createdAt)}</span>
               ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ""}
+              ${
+                images.length
+                  ? `<div class="history-gallery">${images
+                      .map(
+                        (image) => `
+                          <a href="${escapeHtml(image)}" target="_blank">
+                            <img src="${escapeHtml(image)}" alt="${escapeHtml(statusLabel(item.status))}" onerror="this.src='./assets/kt-sport-logo.jpg'" />
+                          </a>
+                        `,
+                      )
+                      .join("")}</div>`
+                  : ""
+              }
             </li>
-          `,
-        )
+          `;
+        })
         .join("")
     : `<li class="empty-state">ຍັງບໍ່ມີ history</li>`;
+
+  if (order?.code) {
+    loadWorkflowLinks(order.code).catch(() => {
+      document.querySelector("#workflowLinks").innerHTML = `<p class="empty-state">ດຶງ link ຂະບວນການບໍ່ໄດ້</p>`;
+    });
+  } else {
+    document.querySelector("#workflowLinks").innerHTML = `<p class="empty-state">ບັນທຶກບິນກ່ອນຈຶ່ງຈະສ້າງ link ໃຫ້ຝ່າຍໄດ້</p>`;
+  }
+}
+
+async function loadWorkflowLinks(code) {
+  const response = await fetch(`/api/orders/${encodeURIComponent(code)}/workflow-links`);
+  if (response.status === 401) {
+    window.location.href = "/login.html";
+    return;
+  }
+  if (!response.ok) throw new Error("LINKS_FAILED");
+  const result = await response.json();
+  document.querySelector("#workflowLinks").innerHTML = result.data
+    .map((link) =>
+      link.adminOnly
+        ? `<div class="workflow-link-row"><strong>${link.index}. ${escapeHtml(link.label)}</strong><span class="empty-state">Admin ກົດໃນໜ້ານີ້ເທົ່ານັ້ນ</span><span></span></div>`
+        : `<div class="workflow-link-row">
+            <strong>${link.index}. ${escapeHtml(link.label)}</strong>
+            <input value="${escapeHtml(link.url)}" readonly />
+            <button type="button" data-copy-workflow-link="${escapeHtml(link.url)}">Copy</button>
+          </div>`,
+    )
+    .join("");
 }
 
 function renderProducts(products) {
@@ -317,6 +363,18 @@ function readFileAsDataUrl(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+async function readFilesAsDataUrls(files, limit = 10) {
+  const selectedFiles = [...(files || [])].slice(0, limit);
+  if (selectedFiles.some((file) => file.size > 25_000_000)) {
+    throw new Error("IMAGE_TOO_LARGE");
+  }
+  const dataUrls = [];
+  for (const file of selectedFiles) {
+    dataUrls.push(await readFileAsDataUrl(file));
+  }
+  return dataUrls;
 }
 
 async function uploadProductImage(input) {
@@ -667,14 +725,23 @@ async function updateWorkflowStatus() {
 
   const status = document.querySelector("#workflowStatusSelect").value;
   const note = document.querySelector("#workflowNoteInput").value.trim();
+  const imageInput = document.querySelector("#workflowImagesInput");
   const button = document.querySelector("#updateWorkflowButton");
   button.disabled = true;
   setAdminNotice("ກຳລັງອັບເດດ status...", "muted");
+  let images = [];
+  try {
+    images = await readFilesAsDataUrls(imageInput.files, 10);
+  } catch {
+    button.disabled = false;
+    setAdminNotice("ຮູບໃຫຍ່ເກີນ 25MB ຕໍ່ຮູບ", "error");
+    return;
+  }
 
   const response = await fetch(`/api/orders/${encodeURIComponent(activeCode)}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status, note }),
+    body: JSON.stringify({ status, note, images }),
   });
 
   if (!response.ok) {
@@ -690,6 +757,7 @@ async function updateWorkflowStatus() {
   const result = await response.json();
   orders = orders.map((order) => (order.code === result.data.code ? result.data : order));
   document.querySelector("#workflowNoteInput").value = "";
+  imageInput.value = "";
   fillForm(result.data);
   setAdminNotice(`ອັບເດດ status ເປັນ ${statusLabel(status)} ແລ້ວ`, "success");
 }
@@ -723,6 +791,17 @@ function setupAdmin() {
   document.querySelector("#updateWorkflowButton").addEventListener("click", updateWorkflowStatus);
   document.querySelector("#copyTrackingButton").addEventListener("click", copyTrackingLink);
   document.querySelector("#logoutButton").addEventListener("click", logout);
+  document.querySelector("#workflowLinks").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-copy-workflow-link]");
+    if (!button) return;
+    const link = button.dataset.copyWorkflowLink;
+    try {
+      await navigator.clipboard.writeText(link);
+      setAdminNotice("Copy link ຂະບວນການສຳເລັດ", "success");
+    } catch {
+      setAdminNotice(link, "success");
+    }
+  });
   document.querySelector("#adminMenuTabs").addEventListener("click", (event) => {
     const menuButton = event.target.closest("[data-admin-menu]");
     if (!menuButton || event.target.matches("[data-admin-name-index]")) return;

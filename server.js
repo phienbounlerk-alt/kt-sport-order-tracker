@@ -41,15 +41,31 @@ const mimeTypes = {
 
 const validStatuses = new Set([
   "PRODUCTION_ORDER",
+  "DESIGN",
   "PATTERN",
   "PRINTING",
   "HEAT_TRANSFER",
   "CUTTING",
+  "QC_BEFORE_SEWING",
   "SEWING",
-  "QC",
-  "READY_TO_COMPLETE",
+  "QC_AFTER_SEWING",
+  "DELIVERY",
   "COMPLETED",
 ]);
+
+const workflowSteps = [
+  { key: "PRODUCTION_ORDER", label: "ອອກບິນຜະລິດ", adminOnly: true },
+  { key: "DESIGN", label: "ອອກແບບ" },
+  { key: "PATTERN", label: "ກຳລັງຂຶ້ນແພັດເທິ້ນ" },
+  { key: "PRINTING", label: "ກຳລັງພິມ" },
+  { key: "HEAT_TRANSFER", label: "ກຳລັງລີດລົງຜ້າ" },
+  { key: "CUTTING", label: "ກຳລັງຕັດ" },
+  { key: "QC_BEFORE_SEWING", label: "QC ກ່ອນຫຍິບ" },
+  { key: "SEWING", label: "ກຳລັງຍິບ" },
+  { key: "QC_AFTER_SEWING", label: "QC ຫຼັງຫຍິບ" },
+  { key: "DELIVERY", label: "ຂົນສົ່ງ" },
+  { key: "COMPLETED", label: "ສຳເລັດແລ້ວ", adminOnly: true },
+];
 
 function parseCookies(req) {
   return Object.fromEntries(
@@ -92,6 +108,39 @@ function extensionForMime(mimeType) {
   }[mimeType];
 }
 
+function workflowLabel(status) {
+  return workflowSteps.find((step) => step.key === status)?.label || status;
+}
+
+function normalizeStatus(status) {
+  const nextStatus = String(status || "").trim().toUpperCase();
+  if (nextStatus === "QC") return "QC_BEFORE_SEWING";
+  if (nextStatus === "READY_TO_COMPLETE") return "DELIVERY";
+  return nextStatus;
+}
+
+function workflowToken(code, status) {
+  return crypto
+    .createHmac("sha256", adminPassword)
+    .update(`${String(code).toUpperCase()}:${normalizeStatus(status)}`)
+    .digest("hex");
+}
+
+function isValidWorkflowToken(code, status, token) {
+  const expected = workflowToken(code, status);
+  const received = String(token || "");
+  return (
+    received.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected))
+  );
+}
+
+function requestBaseUrl(req) {
+  if (publicBaseUrl) return publicBaseUrl;
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  return `${proto}://${req.headers.host}`;
+}
+
 function makeOrderCode(orders) {
   const today = new Date();
   const prefix = `J${String(today.getFullYear()).slice(-2)}${String(today.getMonth() + 1).padStart(
@@ -131,6 +180,29 @@ function normalizeProduct(product, index) {
   };
 }
 
+async function saveDataUrlImage(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    const error = new Error("INVALID_IMAGE");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const mimeType = match[1];
+  const extension = extensionForMime(mimeType);
+  const buffer = Buffer.from(match[2], "base64");
+  if (!extension || buffer.length > maxImageBytes) {
+    const error = new Error("IMAGE_TOO_LARGE_OR_UNSUPPORTED");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  await fs.mkdir(uploadsDir, { recursive: true });
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
+  await fs.writeFile(path.join(uploadsDir, filename), buffer);
+  return `/uploads/${filename}`;
+}
+
 function normalizeAdminName(name, index) {
   const fallback = `Admin ${index + 1}`;
   return String(name || fallback).trim().slice(0, 40) || fallback;
@@ -161,18 +233,25 @@ function normalizeCatalogItem(item = {}, index) {
 
 function normalizeOrder(payload, existingOrder = {}) {
   const products = Array.isArray(payload.products) && payload.products.length > 0 ? payload.products : [];
-  const productionStatus = validStatuses.has(payload.productionStatus)
-    ? payload.productionStatus
+  const requestedStatus = normalizeStatus(payload.productionStatus);
+  const existingStatus = normalizeStatus(existingOrder.productionStatus);
+  const productionStatus = validStatuses.has(requestedStatus)
+    ? requestedStatus
     : existingOrder.productionStatus || "PRODUCTION_ORDER";
 
   const productionHistory =
     Array.isArray(existingOrder.productionHistory) && existingOrder.productionHistory.length > 0
-      ? existingOrder.productionHistory
+      ? existingOrder.productionHistory.map((item) => ({
+          ...item,
+          status: normalizeStatus(item.status),
+          images: Array.isArray(item.images) ? item.images : [],
+        }))
       : [
           {
             status: "PRODUCTION_ORDER",
             note: "ສ້າງບິນຜະລິດ",
             createdAt: new Date().toISOString(),
+            images: [],
           },
         ];
 
@@ -187,7 +266,7 @@ function normalizeOrder(payload, existingOrder = {}) {
     phone: String(payload.phone || existingOrder.phone || "-").trim(),
     addressCf: String(payload.addressCf || existingOrder.addressCf || "-").trim(),
     assignedAdmin: String(payload.assignedAdmin || existingOrder.assignedAdmin || "Admin 1").trim(),
-    productionStatus,
+    productionStatus: validStatuses.has(productionStatus) ? productionStatus : existingStatus || "PRODUCTION_ORDER",
     productImage: String(
       payload.productImage ||
         existingOrder.productImage ||
@@ -215,6 +294,16 @@ async function readOrders() {
   const orders = JSON.parse(raw);
   for (const [code, order] of Object.entries(orders)) {
     if (!order.assignedAdmin) orders[code] = { ...order, assignedAdmin: "Admin 1" };
+    orders[code].productionStatus = validStatuses.has(normalizeStatus(order.productionStatus))
+      ? normalizeStatus(order.productionStatus)
+      : "PRODUCTION_ORDER";
+    orders[code].productionHistory = Array.isArray(order.productionHistory)
+      ? order.productionHistory.map((item) => ({
+          ...item,
+          status: validStatuses.has(normalizeStatus(item.status)) ? normalizeStatus(item.status) : "PRODUCTION_ORDER",
+          images: Array.isArray(item.images) ? item.images : [],
+        }))
+      : [];
   }
   return orders;
 }
@@ -246,6 +335,48 @@ async function writeCatalog(catalog) {
   await fs.mkdir(path.dirname(catalogFile), { recursive: true });
   const data = Array.isArray(catalog) ? catalog.map(normalizeCatalogItem).slice(0, 500) : [];
   await fs.writeFile(catalogFile, `${JSON.stringify(data, null, 2)}\n`);
+}
+
+async function applyWorkflowStatus(order, status, note = "", dataUrls = []) {
+  const nextStatus = normalizeStatus(status);
+  if (!validStatuses.has(nextStatus)) {
+    const error = new Error("INVALID_STATUS");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const images = [];
+  for (const dataUrl of (Array.isArray(dataUrls) ? dataUrls : []).slice(0, 10)) {
+    images.push(await saveDataUrlImage(dataUrl));
+  }
+
+  order.productionStatus = nextStatus;
+  order.productionHistory = Array.isArray(order.productionHistory) ? order.productionHistory : [];
+  order.productionHistory = order.productionHistory.map((item) => ({
+    ...item,
+    status: normalizeStatus(item.status),
+    images: Array.isArray(item.images) ? item.images : [],
+  }));
+
+  const historyItem = order.productionHistory.find((item) => item.status === nextStatus);
+  if (historyItem) {
+    historyItem.note = note || historyItem.note || "";
+    historyItem.createdAt = new Date().toISOString();
+    historyItem.images = [...(historyItem.images || []), ...images].slice(0, 10);
+  } else {
+    order.productionHistory.push({
+      status: nextStatus,
+      note,
+      createdAt: new Date().toISOString(),
+      images,
+    });
+  }
+
+  if (nextStatus === "COMPLETED" && !order.receiveDate) {
+    order.receiveDate = new Date().toISOString();
+  }
+
+  return order;
 }
 
 async function readStaticFile(filePath, res) {
@@ -290,6 +421,8 @@ function collectJson(req) {
 async function handleApi(req, res, url) {
   const orderMatch = url.pathname.match(/^\/api\/orders\/([^/]+)$/);
   const statusMatch = url.pathname.match(/^\/api\/orders\/([^/]+)\/status$/);
+  const workflowLinksMatch = url.pathname.match(/^\/api\/orders\/([^/]+)\/workflow-links$/);
+  const publicWorkflowMatch = url.pathname.match(/^\/api\/workflow\/([^/]+)\/([^/]+)$/);
 
   if (req.method === "GET" && url.pathname === "/api/session") {
     return sendJson(res, 200, { authenticated: isAuthenticated(req) });
@@ -325,26 +458,11 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/uploads") {
     if (!requireAuth(req, res)) return;
     const payload = await collectJson(req);
-    const dataUrl = String(payload.dataUrl || "");
-    const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
-
-    if (!match) {
-      return sendJson(res, 400, { error: "INVALID_IMAGE" });
+    try {
+      return sendJson(res, 201, { url: await saveDataUrlImage(payload.dataUrl) });
+    } catch (error) {
+      return sendJson(res, error.statusCode || 400, { error: error.message });
     }
-
-    const mimeType = match[1];
-    const extension = extensionForMime(mimeType);
-    const buffer = Buffer.from(match[2], "base64");
-
-    if (!extension || buffer.length > maxImageBytes) {
-      return sendJson(res, 400, { error: "IMAGE_TOO_LARGE_OR_UNSUPPORTED" });
-    }
-
-    await fs.mkdir(uploadsDir, { recursive: true });
-    const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
-    const filePath = path.join(uploadsDir, filename);
-    await fs.writeFile(filePath, buffer);
-    return sendJson(res, 201, { url: `/uploads/${filename}` });
   }
 
   if (req.method === "GET" && url.pathname === "/api/settings") {
@@ -383,6 +501,27 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { data });
   }
 
+  if (req.method === "GET" && workflowLinksMatch) {
+    if (!requireAuth(req, res)) return;
+    const code = decodeURIComponent(workflowLinksMatch[1]).toUpperCase();
+    const orders = await readOrders();
+    if (!orders[code]) return sendJson(res, 404, { error: "ORDER_NOT_FOUND" });
+    const baseUrl = requestBaseUrl(req);
+    const data = workflowSteps.map((step, index) => {
+      const token = workflowToken(code, step.key);
+      return {
+        index: index + 1,
+        status: step.key,
+        label: step.label,
+        adminOnly: Boolean(step.adminOnly),
+        url: step.adminOnly
+          ? null
+          : `${baseUrl}/step.html?code=${encodeURIComponent(code)}&status=${encodeURIComponent(step.key)}&token=${token}`,
+      };
+    });
+    return sendJson(res, 200, { data });
+  }
+
   if (req.method === "POST" && url.pathname === "/api/orders") {
     if (!requireAuth(req, res)) return;
     const payload = await collectJson(req);
@@ -408,6 +547,50 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { data: order });
   }
 
+  if (req.method === "GET" && publicWorkflowMatch) {
+    const code = decodeURIComponent(publicWorkflowMatch[1]).toUpperCase();
+    const status = normalizeStatus(decodeURIComponent(publicWorkflowMatch[2]));
+    const token = url.searchParams.get("token");
+    const step = workflowSteps.find((item) => item.key === status);
+    if (!step || step.adminOnly || !isValidWorkflowToken(code, status, token)) {
+      return sendJson(res, 403, { error: "INVALID_WORKFLOW_LINK" });
+    }
+    const orders = await readOrders();
+    const order = orders[code];
+    if (!order) return sendJson(res, 404, { error: "ORDER_NOT_FOUND" });
+    return sendJson(res, 200, {
+      data: {
+        code,
+        status,
+        label: workflowLabel(status),
+        customerName: order.customerName,
+        currentStatus: normalizeStatus(order.productionStatus),
+        currentStatusLabel: workflowLabel(order.productionStatus),
+      },
+    });
+  }
+
+  if (req.method === "POST" && publicWorkflowMatch) {
+    const code = decodeURIComponent(publicWorkflowMatch[1]).toUpperCase();
+    const status = normalizeStatus(decodeURIComponent(publicWorkflowMatch[2]));
+    const token = url.searchParams.get("token");
+    const step = workflowSteps.find((item) => item.key === status);
+    if (!step || step.adminOnly || !isValidWorkflowToken(code, status, token)) {
+      return sendJson(res, 403, { error: "INVALID_WORKFLOW_LINK" });
+    }
+    const payload = await collectJson(req);
+    const orders = await readOrders();
+    const order = orders[code];
+    if (!order) return sendJson(res, 404, { error: "ORDER_NOT_FOUND" });
+    try {
+      await applyWorkflowStatus(order, status, String(payload.note || "").trim(), payload.images);
+    } catch (error) {
+      return sendJson(res, error.statusCode || 400, { error: error.message });
+    }
+    await writeOrders(orders);
+    return sendJson(res, 200, { data: order });
+  }
+
   if (req.method === "PUT" && orderMatch) {
     if (!requireAuth(req, res)) return;
     const code = decodeURIComponent(orderMatch[1]).toUpperCase();
@@ -426,7 +609,7 @@ async function handleApi(req, res, url) {
     if (!requireAuth(req, res)) return;
     const code = decodeURIComponent(statusMatch[1]).toUpperCase();
     const payload = await collectJson(req);
-    const status = String(payload.status || "").trim().toUpperCase();
+    const status = normalizeStatus(payload.status);
     const note = String(payload.note || "").trim();
 
     if (!validStatuses.has(status)) {
@@ -437,23 +620,10 @@ async function handleApi(req, res, url) {
     const order = orders[code];
     if (!order) return sendJson(res, 404, { error: "ORDER_NOT_FOUND" });
 
-    order.productionStatus = status;
-    order.productionHistory = Array.isArray(order.productionHistory) ? order.productionHistory : [];
-
-    const historyItem = order.productionHistory.find((item) => item.status === status);
-    if (historyItem) {
-      historyItem.note = note || historyItem.note || "";
-      historyItem.createdAt = historyItem.createdAt || new Date().toISOString();
-    } else {
-      order.productionHistory.push({
-        status,
-        note,
-        createdAt: new Date().toISOString(),
-      });
-    }
-
-    if (status === "COMPLETED" && !order.receiveDate) {
-      order.receiveDate = new Date().toISOString();
+    try {
+      await applyWorkflowStatus(order, status, note, payload.images);
+    } catch (error) {
+      return sendJson(res, error.statusCode || 400, { error: error.message });
     }
 
     await writeOrders(orders);

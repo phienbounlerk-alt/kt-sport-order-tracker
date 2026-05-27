@@ -993,7 +993,7 @@ textarea {
 
 .workflow-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) minmax(160px, 0.7fr) auto;
   gap: 10px;
   margin-top: 14px;
   align-items: end;
@@ -1120,6 +1120,44 @@ textarea {
   background: white;
 }
 
+.workflow-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.workflow-link-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.workflow-link-row input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: white;
+}
+
+.workflow-link-row button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--main);
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+}
+
 .workflow-history {
   display: grid;
   gap: 8px;
@@ -1150,6 +1188,85 @@ textarea {
   margin: 8px 0 0;
   color: var(--ink);
   font-size: 13px;
+}
+
+.history-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 8px;
+  max-width: 380px;
+  margin-top: 8px;
+}
+
+.history-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.step-shell {
+  width: min(100% - 28px, 760px);
+  margin: 46px auto;
+}
+
+.step-card {
+  display: grid;
+  gap: 18px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.step-card h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.18;
+}
+
+.step-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.step-summary div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.step-summary span,
+.step-summary strong {
+  display: block;
+}
+
+.step-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.step-summary strong {
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+#stepNotice {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+#stepNotice[data-tone="success"] {
+  color: var(--ok);
+}
+
+#stepNotice[data-tone="error"] {
+  color: #b3261e;
 }
 
 .product-list {
@@ -1564,6 +1681,7 @@ textarea {
   .admin-layout,
   .form-grid,
   .workflow-controls,
+  .workflow-link-row,
   .admin-menu-panel,
   .shop-hero,
   .shop-controls,
@@ -1610,6 +1728,10 @@ textarea {
 
   .product-price {
     grid-column: 2;
+  }
+
+  .step-summary {
+    grid-template-columns: 1fr;
   }
 }
 
