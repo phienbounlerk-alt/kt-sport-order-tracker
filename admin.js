@@ -16,11 +16,12 @@ const productionSteps = [
 ];
 
 const roleDefinitions = [
-  { key: "president", title: "ປະທານ", name: "KHOTA", canSeeValue: true, canUseTouchId: false },
-  { key: "vice", title: "ຮອງປະທານ", name: "KHAMTAN", canSeeValue: true, canUseTouchId: false },
+  { key: "president", title: "ປະທານ", name: "KHOTA", canSeeValue: true, canUseTouchId: true, canAccessPeople: true },
+  { key: "vice", title: "ຮອງປະທານ", name: "KHAMTAN", canSeeValue: true, canUseTouchId: true, canAccessPeople: true },
   { key: "manager", title: "ຜູ້ຈັດການ", name: "JALOUN", canSeeValue: false, canUseTouchId: false },
   { key: "accounting", title: "ບັນຊີ", name: "Accounting", canSeeValue: true, canUseTouchId: false },
-  { key: "engineer", title: "Software Engineer", name: "Engineer", canSeeValue: true, canUseTouchId: true },
+  { key: "engineer", title: "Software Engineer", name: "Engineer", canSeeValue: true, canUseTouchId: true, engineerOnly: true },
+  { key: "admin", title: "Admin", name: "No password", canSeeValue: true, noPasscode: true },
 ];
 
 const defaultRolePasscodes = {
@@ -172,8 +173,11 @@ function renderRoleMenu() {
 
 function refreshRoleLogin() {
   const role = roleInfo(selectedRole);
-  document.querySelector("#roleLoginTitle").textContent = `${roleDisplay(role)} - ໃສ່ລະຫັດເພື່ອເຂົ້າ`;
+  document.querySelector("#roleLoginTitle").textContent = role.noPasscode
+    ? `${roleDisplay(role)} - ບໍ່ຕ້ອງໃສ່ລະຫັດ`
+    : `${roleDisplay(role)} - ໃສ່ລະຫັດເພື່ອເຂົ້າ`;
   document.querySelector("#rolePasscodeInput").value = "";
+  document.querySelector("#rolePasscodeInput").disabled = Boolean(role.noPasscode);
   document.querySelector("#touchIdButton").hidden = !role.canUseTouchId || !window.PublicKeyCredential;
   renderRoleMenu();
 }
@@ -186,6 +190,7 @@ function setRoleWorkspace(roleKey) {
   document.querySelector("#adminWorkspace").hidden = false;
   document.querySelector("#activeRoleLabel").textContent = `ເຂົ້າເມນູ: ${roleDisplay(role)}`;
   document.querySelector("#roleToolsTitle").textContent = `ຕັ້ງຄ່າລະຫັດ: ${roleDisplay(role)}`;
+  document.querySelector(".role-tools-panel").hidden = Boolean(role.noPasscode);
   document.querySelector("#registerTouchIdButton").hidden = !role.canUseTouchId || !window.PublicKeyCredential;
   renderStats();
   renderOrdersList();
@@ -200,6 +205,11 @@ function lockRoleWorkspace() {
 }
 
 function unlockSelectedRole(passcode) {
+  if (roleInfo(selectedRole).noPasscode) {
+    setRoleWorkspace(selectedRole);
+    setAdminNotice("ເຂົ້າເມນູ Admin ສຳເລັດ", "success");
+    return true;
+  }
   if (String(passcode || "") !== String(rolePasscodes()[selectedRole] || "")) {
     setRoleNotice("ລະຫັດບໍ່ຖືກ", "error");
     return false;
@@ -232,7 +242,8 @@ function randomChallenge() {
 }
 
 async function registerTouchId() {
-  if (!activeRole || activeRole !== "engineer" || !window.PublicKeyCredential) {
+  const role = roleInfo(activeRole);
+  if (!activeRole || !role.canUseTouchId || !window.PublicKeyCredential) {
     setAdminNotice("Browser ນີ້ບໍ່ຮອງຮັບ Touch ID", "error");
     return;
   }
@@ -246,22 +257,23 @@ async function registerTouchId() {
       challenge: randomChallenge(),
       rp: { name: "KT SPORT" },
       user: {
-        id: new TextEncoder().encode("kt-sport-engineer"),
-        name: "software-engineer@kt-sport",
-        displayName: "KT SPORT Software Engineer",
+        id: new TextEncoder().encode(`kt-sport-${activeRole}`),
+        name: `${activeRole}@kt-sport`,
+        displayName: `KT SPORT ${roleDisplay(role)}`,
       },
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
       timeout: 60000,
     },
   });
-  localStorage.setItem("ktEngineerCredentialId", bufferToBase64Url(credential.rawId));
-  setAdminNotice("ຕັ້ງ Touch ID ສຳເລັດໃນ Mac ເຄື່ອງນີ້", "success");
+  localStorage.setItem(`ktCredentialId:${activeRole}`, bufferToBase64Url(credential.rawId));
+  setAdminNotice(`ຕັ້ງ Touch ID ສຳເລັດສຳລັບ ${roleDisplay(role)} ໃນ Mac ເຄື່ອງນີ້`, "success");
 }
 
 async function unlockWithTouchId() {
-  if (selectedRole !== "engineer" || !window.PublicKeyCredential) return;
-  const credentialId = localStorage.getItem("ktEngineerCredentialId");
+  const role = roleInfo(selectedRole);
+  if (!role.canUseTouchId || !window.PublicKeyCredential) return;
+  const credentialId = localStorage.getItem(`ktCredentialId:${selectedRole}`);
   if (!credentialId) {
     setRoleNotice("ກະລຸນາເຂົ້າດ້ວຍລະຫັດແລ້ວຕັ້ງ Touch ID ກ່ອນ", "error");
     return;
@@ -275,8 +287,8 @@ async function unlockWithTouchId() {
         timeout: 60000,
       },
     });
-    setRoleWorkspace("engineer");
-    setAdminNotice("ເຂົ້າ Software Engineer ດ້ວຍ Touch ID ສຳເລັດ", "success");
+    setRoleWorkspace(selectedRole);
+    setAdminNotice(`ເຂົ້າ ${roleDisplay(role)} ດ້ວຍ Touch ID ສຳເລັດ`, "success");
   } catch {
     setRoleNotice("Touch ID ບໍ່ສຳເລັດ", "error");
   }
