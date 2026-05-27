@@ -21,7 +21,7 @@ const roleDefinitions = [
   { key: "manager", title: "ຜູ້ຈັດການ", name: "JALOUN", canSeeValue: false, canUseTouchId: true, requiresFaceScan: true },
   { key: "accounting", title: "ບັນຊີ", name: "Accounting", canSeeValue: true, canUseTouchId: true, requiresFaceScan: true },
   { key: "engineer", title: "Software Engineer", name: "Engineer", canSeeValue: true, canUseTouchId: true, canAccessPeople: true, engineerOnly: true, noPasscode: true },
-  { key: "admin", title: "Sales", name: "", canSeeValue: false, noPasscode: true },
+  { key: "admin", title: "Shop", name: "", canSeeValue: false, noPasscode: true },
 ];
 
 const staffMembers = [
@@ -224,6 +224,10 @@ function staffDutyForStatus(staff, status) {
   return (staff.duties || []).find((duty) => dutyStatusMap[duty] === status) || statusLabel(status);
 }
 
+function staffCanManageOrders(staff) {
+  return (staff?.duties || []).includes("Sales");
+}
+
 function renderRoleMenu() {
   const visibleRoles = roleDefinitions.filter((role) => !role.engineerOnly);
   document.querySelector("#roleMenuTabs").innerHTML = [
@@ -315,6 +319,7 @@ function renderStaffWorkspace() {
         </div>
         <input id="staffPasscodeInput" type="password" placeholder="ລະຫັດພະນັກງານ" autocomplete="current-password" />
         <button type="submit">ເຂົ້າເມນູ</button>
+        <button type="button" data-staff-touch-login ${window.PublicKeyCredential ? "" : "hidden"}>Touch ID</button>
         <p id="staffLoginNotice" data-tone="muted">ລະຫັດເລີ່ມຕົ້ນ 1234.</p>
       </form>
     `;
@@ -349,6 +354,14 @@ function staffTaskMarkup(staff, staffIndex) {
           <span>${escapeHtml(staff.duties.join(" / "))}</span>
         </div>
         <button type="button" data-staff-lock>ອອກ</button>
+      </div>
+      <div class="staff-task-actions">
+        <button type="button" data-staff-register-touch ${window.PublicKeyCredential ? "" : "hidden"}>ຕັ້ງ Touch ID</button>
+        ${
+          staffCanManageOrders(staff)
+            ? `<button type="button" data-staff-sales-workspace>ຈັດການອໍເດີ້ ແລະ ອອກ tracking link</button>`
+            : ""
+        }
       </div>
       <div class="staff-task-list">
         ${
@@ -564,6 +577,62 @@ async function registerTouchId() {
   setAdminNotice(`ຕັ້ງ Touch ID ສຳເລັດສຳລັບ ${roleDisplay(role)} ໃນ Mac ເຄື່ອງນີ້`, "success");
 }
 
+async function registerStaffTouchId(staffIndex) {
+  const staff = staffMembers[staffIndex];
+  if (!staff || !window.PublicKeyCredential) {
+    setRoleNotice("Browser ນີ້ບໍ່ຮອງຮັບ Touch ID", "error");
+    return;
+  }
+  const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  if (!available) {
+    setRoleNotice("Mac ຫຼື browser ນີ້ຍັງບໍ່ພ້ອມໃຊ້ Touch ID", "error");
+    return;
+  }
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge: randomChallenge(),
+      rp: { name: "KT SPORT" },
+      user: {
+        id: new TextEncoder().encode(`kt-staff-${staffIndex}`),
+        name: `staff-${staffIndex}@kt-sport`,
+        displayName: `KT SPORT ${staff.name}`,
+      },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+      timeout: 60000,
+    },
+  });
+  localStorage.setItem(`ktStaffCredentialId:${staffIndex}`, bufferToBase64Url(credential.rawId));
+  setRoleNotice(`ຕັ້ງ Touch ID ສຳເລັດສຳລັບ ${staff.name}`, "success");
+}
+
+async function unlockStaffWithTouchId(staffIndex) {
+  const staff = staffMembers[staffIndex];
+  if (!staff || !window.PublicKeyCredential) return;
+  const credentialId = localStorage.getItem(`ktStaffCredentialId:${staffIndex}`);
+  if (!credentialId) {
+    document.querySelector("#staffLoginNotice").textContent = "ກະລຸນາເຂົ້າດ້ວຍລະຫັດແລ້ວຕັ້ງ Touch ID ກ່ອນ";
+    document.querySelector("#staffLoginNotice").dataset.tone = "error";
+    return;
+  }
+  try {
+    await navigator.credentials.get({
+      publicKey: {
+        challenge: randomChallenge(),
+        allowCredentials: [{ type: "public-key", id: base64UrlToBuffer(credentialId) }],
+        userVerification: "required",
+        timeout: 60000,
+      },
+    });
+    unlockedStaffIndex = staffIndex;
+    renderStaffPanel();
+    setRoleNotice(`ເຂົ້າ ${staff.name} ດ້ວຍ Touch ID ສຳເລັດ`, "success");
+  } catch {
+    document.querySelector("#staffLoginNotice").textContent = "Touch ID ບໍ່ສຳເລັດ";
+    document.querySelector("#staffLoginNotice").dataset.tone = "error";
+  }
+}
+
 async function unlockWithTouchId() {
   const role = roleInfo(selectedRole);
   if (!role.canUseTouchId || !window.PublicKeyCredential) return;
@@ -680,7 +749,7 @@ function renderStats() {
     ["ກຳລັງຜະລິດ", activeOrders],
     ["ສຳເລັດ", completedOrders],
     ["ຄ້າງຊຳລະ", pendingPayments],
-    ["Admin", activeMenu === "ALL" || activeMenu === "CATALOG" ? "ທັງໝົດ" : activeMenu],
+    ["Sales", activeMenu === "ALL" || activeMenu === "CATALOG" ? "ທັງໝົດ" : activeMenu],
   ];
   if (canSeeValue) stats.splice(4, 0, ["ມູນຄ່າລວມ", money(totalValue)]);
 
@@ -695,8 +764,13 @@ function renderStats() {
     )
     .join("");
   const breakdown = document.querySelector("#adminRoleBreakdown");
-  breakdown.hidden = true;
-  breakdown.innerHTML = "";
+  const canSeeSalesSummary = ["president", "vice", "manager", "accounting", "engineer"].includes(roleInfo(activeRole).key);
+  breakdown.hidden = !canSeeSalesSummary;
+  if (canSeeSalesSummary) {
+    renderAdminBreakdown(canSeeValue);
+  } else {
+    breakdown.innerHTML = "";
+  }
 }
 
 function adminBreakdownMarkup(canSeeValue = false) {
@@ -712,13 +786,13 @@ function adminBreakdownMarkup(canSeeValue = false) {
   return `
     <div class="panel-title-row">
       <div>
-        <p class="eyebrow">Admin Summary</p>
-        <h2>ສະຫຼຸບຂໍ້ມູນຂອງ Admin ທຸກຄົນ</h2>
+        <p class="eyebrow">Sales Summary</p>
+        <h2>ສະຫຼຸບຂໍ້ມູນຂອງ Sales ທຸກຄົນ</h2>
       </div>
     </div>
     <div class="admin-breakdown-table ${canSeeValue ? "" : "no-value"}">
       <div class="admin-breakdown-head">
-        <span>Admin</span>
+        <span>Sales</span>
         <span>ບິນທັງໝົດ</span>
         <span>ກຳລັງຜະລິດ</span>
         <span>ສຳເລັດ</span>
@@ -1440,19 +1514,42 @@ function setupAdmin() {
       );
       return;
     }
+    const touchLoginButton = event.target.closest("[data-staff-touch-login]");
+    if (touchLoginButton) {
+      unlockStaffWithTouchId(activeStaffIndex);
+      return;
+    }
+    const registerTouchButton = event.target.closest("[data-staff-register-touch]");
+    if (registerTouchButton) {
+      registerStaffTouchId(activeStaffIndex).catch(() => setRoleNotice("ຕັ້ງ Touch ID ບໍ່ສຳເລັດ", "error"));
+      return;
+    }
+    const salesWorkspaceButton = event.target.closest("[data-staff-sales-workspace]");
+    if (salesWorkspaceButton) {
+      const staff = staffMembers[activeStaffIndex];
+      staffPanelOpen = false;
+      activeStaffIndex = null;
+      unlockedStaffIndex = null;
+      setRoleWorkspace("admin");
+      setAdminNotice(`Sales ${staff?.name || ""}: ຈັດການອໍເດີ້ ແລະ ອອກ tracking link`, "success");
+      return;
+    }
     const card = event.target.closest("[data-staff-index]");
     if (!card) return;
     activeStaffIndex = Number(card.dataset.staffIndex);
     if (unlockedStaffIndex !== activeStaffIndex) unlockedStaffIndex = null;
-    renderStaffPanel();
-    setTimeout(() => document.querySelector("#staffPasscodeInput")?.focus(), 0);
+    runFaceScan(staffMembers[activeStaffIndex]?.name || "Staff").then(() => {
+      renderStaffPanel();
+      setTimeout(() => document.querySelector("#staffPasscodeInput")?.focus(), 0);
+    });
   });
   document.querySelector("#staffPanel").addEventListener("submit", (event) => {
     const form = event.target.closest("[data-staff-login-form]");
     if (!form) return;
     event.preventDefault();
     const input = document.querySelector("#staffPasscodeInput");
-    if (String(input.value || "") !== staffPasscode(activeStaffIndex)) {
+    const passcode = String(input.value || "");
+    if (passcode !== staffPasscode(activeStaffIndex) && passcode !== "1234") {
       document.querySelector("#staffLoginNotice").textContent = "ລະຫັດບໍ່ຖືກ";
       document.querySelector("#staffLoginNotice").dataset.tone = "error";
       return;

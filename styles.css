@@ -914,8 +914,12 @@ textarea {
 }
 
 .staff-login-form {
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.6fr) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.6fr) auto auto;
   align-items: end;
+}
+
+.staff-login-form p {
+  grid-column: 1 / -1;
 }
 
 .staff-login-form input {
@@ -940,6 +944,12 @@ textarea {
 .staff-task-list {
   display: grid;
   gap: 8px;
+}
+
+.staff-task-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .staff-task-item {
