@@ -16,12 +16,43 @@ const productionSteps = [
 ];
 
 const roleDefinitions = [
-  { key: "president", title: "ປະທານ", name: "KHOTA", canSeeValue: true, canUseTouchId: true, canAccessPeople: true, requiresFaceScan: true },
+  { key: "president", title: "ປະທານ", name: "KHOOTA", canSeeValue: true, canUseTouchId: true, canAccessPeople: true, requiresFaceScan: true },
   { key: "vice", title: "ຮອງປະທານ", name: "KHAMTAN", canSeeValue: true, canUseTouchId: true, canAccessPeople: true, requiresFaceScan: true },
   { key: "manager", title: "ຜູ້ຈັດການ", name: "JALOUN", canSeeValue: false, canUseTouchId: true, requiresFaceScan: true },
   { key: "accounting", title: "ບັນຊີ", name: "Accounting", canSeeValue: true, canUseTouchId: true, requiresFaceScan: true },
   { key: "engineer", title: "Software Engineer", name: "Engineer", canSeeValue: true, canUseTouchId: true, canAccessPeople: true, engineerOnly: true, noPasscode: true },
-  { key: "admin", title: "Admin", name: "No password", canSeeValue: false, noPasscode: true },
+  { key: "admin", title: "Sales", name: "", canSeeValue: false, noPasscode: true },
+];
+
+const staffMembers = [
+  ["Mr Khota XAIYASAN", "22/10/1996"],
+  ["Mr Khamtan Derndavong", "7/2/1995"],
+  ["Mr Jaloun Gnonkaseumsouk", "4/10/1995"],
+  ["Ms Keoludda Dengkhamxeun", "1/12/1996"],
+  ["Ms Bountham Nala", "3/4/1993"],
+  ["Ms Lamphaen Nala", "2/5/1998"],
+  ["Mr Khamthey Phimmalarth", "29/12/2000"],
+  ["Mr Phian", "10/2/2001"],
+  ["Mr Xokxai", "10/4/2004"],
+  ["Mr Jord", "17/5/2001"],
+  ["Ms Touktik", "14/6/1989"],
+  ["Mr Nickky", "12/5/2002"],
+  ["Ms Bungone", "10/6/2002"],
+  ["Mr Keoudone", "2/10/2000"],
+  ["Mr Xaiy", "5/6/1999"],
+  ["Ms Nuiy", "10/3/1999"],
+  ["Ms Namtarn", "9/1/2010"],
+  ["Ms Loy", "20/5/2009"],
+  ["Ms koukkik", "22/4/1999"],
+  ["Ms Nang", "2/1/2003"],
+  ["Ms Grand", "17/3/2010"],
+  ["Ms Phet", "2/11/2002"],
+  ["Ms Tieng", "10/2/1992"],
+  ["Mr Keng", "25/1/2000"],
+  ["Ms May Outsourcing Marketing", "ບໍ່ມີຂໍ້ມູນ"],
+  ["Mr SONG", "13/3/2000"],
+  ["Mr Louiy", "28/01/1997"],
+  ["MS Anong", "12/11/2000"],
 ];
 
 const defaultRolePasscodes = {
@@ -38,6 +69,8 @@ let settings = {
   adminNames: Array.from({ length: 10 }, (_, index) => `Admin ${index + 1}`),
   shopPhone: "8562077728239",
   rolePasscodes: { ...defaultRolePasscodes },
+  rolePhotos: {},
+  staffPhotos: {},
 };
 let activeMenu = "ALL";
 let selectedRole = "president";
@@ -46,6 +79,7 @@ let lastRoleClick = { key: "", at: 0 };
 let lastAdminClick = { name: "", at: 0 };
 let executiveUnlocked = false;
 let engineerUnlocked = false;
+let staffPanelOpen = false;
 let catalogItems = [];
 let catalogSearch = "";
 let filters = {
@@ -116,7 +150,7 @@ function roleInfo(key = activeRole || selectedRole) {
 }
 
 function roleDisplay(role = roleInfo()) {
-  return `${role.title} ${role.name}`;
+  return [role.title, role.name].filter(Boolean).join(" ");
 }
 
 function setAdminNotice(message, tone = "muted") {
@@ -162,19 +196,67 @@ function rolePasscodes() {
 }
 
 function renderRoleMenu() {
-  document.querySelector("#roleMenuTabs").innerHTML = roleDefinitions
-    .filter((role) => !role.engineerOnly)
+  const visibleRoles = roleDefinitions.filter((role) => !role.engineerOnly);
+  document.querySelector("#roleMenuTabs").innerHTML = [
+    ...visibleRoles
     .map(
       (role, index) => `
-        <button class="role-menu-card ${selectedRole === role.key ? "active" : ""}" data-role-key="${role.key}" type="button">
-          <span>${index + 1}</span>
+        <div class="role-menu-card ${selectedRole === role.key && !staffPanelOpen ? "active" : ""}" data-role-key="${role.key}" role="button" tabindex="0">
+          <label class="role-photo-picker" title="Upload photo">
+            <img src="${escapeHtml(settings.rolePhotos?.[role.key] || "./assets/kt-sport-logo.jpg")}" alt="${escapeHtml(roleDisplay(role))}" />
+            <input data-role-photo-key="${role.key}" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+          </label>
           <strong>${role.title}</strong>
-          <small>${role.name}</small>
-        </button>
+          ${role.name ? `<small>${role.name}</small>` : ""}
+        </div>
       `,
-    )
-    .join("");
-  renderRoleMenuSummary();
+    ),
+    `
+      <div class="role-menu-card ${staffPanelOpen ? "active" : ""}" data-staff-menu role="button" tabindex="0">
+        <label class="role-photo-picker" title="Upload photo">
+          <img src="${escapeHtml(settings.rolePhotos?.staff || "./assets/kt-sport-logo.jpg")}" alt="ພະນັກງານ" />
+          <input data-role-photo-key="staff" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+        </label>
+        <strong>ພະນັກງານ</strong>
+        <small>${staffMembers.length} ຄົນ</small>
+      </div>
+    `,
+  ].join("");
+  renderStaffPanel();
+}
+
+function renderStaffPanel() {
+  const panel = document.querySelector("#staffPanel");
+  if (!panel) return;
+  panel.hidden = !staffPanelOpen;
+  if (!staffPanelOpen) {
+    panel.innerHTML = "";
+    return;
+  }
+  panel.innerHTML = `
+    <div class="panel-title-row">
+      <div>
+        <p class="eyebrow">KT SPORT</p>
+        <h2>ພະນັກງານ</h2>
+      </div>
+    </div>
+    <div class="staff-grid">
+      ${staffMembers
+        .map(
+          ([name, birthDate], index) => `
+            <article class="staff-card">
+              <label class="staff-photo-picker" title="Upload photo">
+                <img src="${escapeHtml(settings.staffPhotos?.[index] || "./assets/kt-sport-logo.jpg")}" alt="${escapeHtml(name)}" />
+                <input data-staff-photo-index="${index}" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              </label>
+              <strong>${escapeHtml(name.toUpperCase())}</strong>
+              <span>${escapeHtml(birthDate)}</span>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function refreshRoleLogin() {
@@ -496,9 +578,8 @@ function renderStats() {
     )
     .join("");
   const breakdown = document.querySelector("#adminRoleBreakdown");
-  const hideWorkspaceBreakdown = roleInfo(activeRole).key === "admin";
-  breakdown.hidden = hideWorkspaceBreakdown;
-  if (!hideWorkspaceBreakdown) renderAdminBreakdown(canSeeValue);
+  breakdown.hidden = true;
+  breakdown.innerHTML = "";
 }
 
 function adminBreakdownMarkup(canSeeValue = false) {
@@ -868,6 +949,8 @@ async function loadSettings() {
   settings = {
     ...result.data,
     rolePasscodes: { ...defaultRolePasscodes, ...(result.data.rolePasscodes || {}) },
+    rolePhotos: result.data.rolePhotos || {},
+    staffPhotos: result.data.staffPhotos || {},
   };
   renderAssignedAdminSelect(settings.adminNames[0]);
   renderAdminMenu();
@@ -892,6 +975,8 @@ async function saveSettings() {
   settings = {
     ...result.data,
     rolePasscodes: { ...defaultRolePasscodes, ...(result.data.rolePasscodes || {}) },
+    rolePhotos: result.data.rolePhotos || {},
+    staffPhotos: result.data.staffPhotos || {},
   };
   if (activeMenu !== "CATALOG" && activeMenu !== "ALL" && !settings.adminNames.includes(activeMenu)) {
     activeMenu = settings.adminNames[0];
@@ -1154,15 +1239,46 @@ function setupAdmin() {
   document.querySelector("#logoutButton").addEventListener("click", logout);
   document.querySelector("#changeRoleButton").addEventListener("click", lockRoleWorkspace);
   document.querySelector("#roleMenuTabs").addEventListener("click", (event) => {
+    if (event.target.matches("input[type='file']") || event.target.closest(".role-photo-picker")) return;
+    const staffButton = event.target.closest("[data-staff-menu]");
+    if (staffButton) {
+      staffPanelOpen = true;
+      renderRoleMenu();
+      return;
+    }
     const button = event.target.closest("[data-role-key]");
     if (!button) return;
     const roleKey = button.dataset.roleKey;
     const now = Date.now();
     const isSecondClick = lastRoleClick.key === roleKey && now - lastRoleClick.at < 700;
     selectedRole = button.dataset.roleKey;
+    staffPanelOpen = false;
     refreshRoleLogin();
     lastRoleClick = { key: roleKey, at: now };
     if (isSecondClick) beginRoleEntry(roleKey);
+  });
+  document.querySelector("#roleAccessPanel").addEventListener("change", async (event) => {
+    const roleInput = event.target.closest("[data-role-photo-key]");
+    const staffInput = event.target.closest("[data-staff-photo-index]");
+    if (!roleInput && !staffInput) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const image = await readFileAsDataUrl(file);
+      if (roleInput) {
+        settings.rolePhotos = { ...(settings.rolePhotos || {}), [roleInput.dataset.rolePhotoKey]: image };
+      }
+      if (staffInput) {
+        settings.staffPhotos = { ...(settings.staffPhotos || {}), [staffInput.dataset.staffPhotoIndex]: image };
+      }
+      await saveSettings();
+      renderRoleMenu();
+      setRoleNotice("ບັນທຶກຮູບສຳເລັດ", "success");
+    } catch {
+      setRoleNotice("ອັບໂຫຼດຮູບບໍ່ສຳເລັດ", "error");
+    } finally {
+      event.target.value = "";
+    }
   });
   document.querySelector("#roleLoginForm").addEventListener("submit", (event) => {
     event.preventDefault();

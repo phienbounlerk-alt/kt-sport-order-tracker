@@ -744,8 +744,9 @@ textarea {
 
 .role-menu-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(6, minmax(118px, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
 .engineer-access-button {
@@ -767,16 +768,17 @@ textarea {
 }
 
 .role-menu-card {
-  min-height: 112px;
+  min-height: 172px;
   display: grid;
-  gap: 6px;
-  align-content: center;
-  padding: 14px;
+  gap: 8px;
+  justify-items: center;
+  align-content: start;
+  padding: 12px 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 999px 999px 28px 28px;
   background: #fbfcfd;
   color: var(--ink);
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -786,23 +788,105 @@ textarea {
   box-shadow: 0 10px 22px rgba(207, 44, 39, 0.12);
 }
 
-.role-menu-card span {
-  width: 30px;
-  height: 30px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--main);
-  color: white;
-  font-weight: 900;
-}
-
 .role-menu-card strong {
-  font-size: 18px;
+  font-size: 15px;
+  line-height: 1.15;
 }
 
 .role-menu-card small,
 .role-active-label {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.role-photo-picker,
+.staff-photo-picker {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.role-photo-picker {
+  width: 98px;
+  height: 98px;
+}
+
+.role-photo-picker img,
+.staff-photo-picker img {
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(207, 44, 39, 0.3);
+  border-radius: 50%;
+  object-fit: cover;
+  background: white;
+}
+
+.role-photo-picker::after,
+.staff-photo-picker::after {
+  content: "+";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--main);
+  color: white;
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(207, 44, 39, 0.24);
+}
+
+.role-photo-picker input,
+.staff-photo-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.staff-panel {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.staff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.staff-card {
+  min-height: 190px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  text-align: center;
+}
+
+.staff-photo-picker {
+  width: 90px;
+  height: 90px;
+}
+
+.staff-card strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.staff-card span {
   color: var(--muted);
   font-weight: 800;
 }
